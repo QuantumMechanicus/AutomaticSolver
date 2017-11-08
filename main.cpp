@@ -5,8 +5,9 @@
 #include <iostream>
 
 namespace po = boost::program_options;
-void readPointsFromFile(std::fstream &f, Eigen::Matrix<double, 2, Eigen::Dynamic> &m)
+void readPointsFromFile(std::string &name, Eigen::Matrix<double, 2, Eigen::Dynamic> &m)
 {
+    std::fstream f(name, std::fstream::in);
     std::vector<std::pair<double, double>> v;
     while (!f.eof())
     {
@@ -23,6 +24,7 @@ void readPointsFromFile(std::fstream &f, Eigen::Matrix<double, 2, Eigen::Dynamic
         m(0, k) = v[k].first;
         m(1, k) = v[k].second;
     }
+    f.close();
 }
 int main(int argc, char *argv[]) {
 
@@ -56,16 +58,24 @@ int main(int argc, char *argv[]) {
     }
     std::cout << input1 << std::endl;
     std::cout << input2 << std::endl;
-    std::fstream f1(input1);
-    std::fstream f2(input2);
     Eigen::Matrix<double, 2, Eigen::Dynamic> u1d, u2d;
-    readPointsFromFile(f1, u1d);
-    readPointsFromFile(f2, u2d);
+    readPointsFromFile(input1, u1d);
+    readPointsFromFile(input2, u2d);
     std::cout << u1d << std::endl;
+    std::cout << u2d << std::endl;
+    u1d.row(0) = u1d.row(0) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1,u1d.cols())*7360.0/2.0;
+
+    u1d.row(1) = u1d.row(1) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1,u1d.cols())*4912.0/2.0;
+
+    u2d.row(0) = u2d.row(0) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1,u1d.cols())*7360.0/2.0;
+
+    u2d.row(1) = u2d.row(1) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1,u1d.cols())*4912.0/2.0;
+    //u1d = u1d/1000;
+    //u2d = u2d/1000;
     Eigen::Matrix3d F;
     double Lambda;
 
-    size_t inl = getFundamentalMatrixAndLambda(u1d, u2d, F, Lambda, 1, 4);
+    size_t inl = getFundamentalMatrixAndLambda(u1d, u2d, F, Lambda, 900, 4);
 
 
 
