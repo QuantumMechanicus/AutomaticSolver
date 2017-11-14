@@ -557,9 +557,11 @@ PairOfMatricesFandLambdas run_solver8pt(EightPoints &u1d, EightPoints &u2d) {
 }
 
 size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
+                         double w, double h,
                          double hyp_lambda, Eigen::Matrix3d &hyp_F, double threshold,
                          double &modelErr) {
-    //hyp_F.transposeInPlace();
+    hyp_F.transposeInPlace();
+    double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
     Eigen::Matrix<double, 2, Eigen::Dynamic> r1d;
     r1d.resize(Eigen::NoChange, u1d.cols());
     r1d.row(0) = (u1d.row(0).cwiseProduct(u1d.row(0)) + u1d.row(1).cwiseProduct(u1d.row(1)));
@@ -592,24 +594,20 @@ size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::M
     uu2.row(1) = u2.row(1);
 
 
-
-
     Eigen::Matrix<double, 3, Eigen::Dynamic> l1 = (hyp_F * uu1);
     Eigen::Matrix<double, 3, Eigen::Dynamic> l2 = (hyp_F.transpose() * uu2);
 
-    std::fstream f_errs("errors.txt", std::fstream::app);
-    f_errs << "\n F:\n" << hyp_F << "\n Lambda: " << hyp_lambda << "\n Errors: \n " << std::endl;
+
     for (size_t k = 0; k < u1d.cols(); ++k) {
         double c1 = l1.col(k).template topRows<2>().norm();
         double c2 = l2.col(k).template topRows<2>().norm();
         double err = std::abs(uu2.col(k).dot(l1.col(k)) / c1) + std::abs(uu1.col(k).dot(l2.col(k)) / c2);
-        f_errs << err << " ";
+
         if (std::abs(err) < threshold)
             ++goods;
         modelErr += err;
     }
-    f_errs << std::endl;
-    f_errs.close();
+
     return goods;
 }
 
@@ -633,16 +631,28 @@ std::size_t updateNumberofIters(double confidence, double error_prob, std::size_
 
 size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
-                                     Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
-                                     Eigen::Matrix3d &F, double &Lambda,
+                                     Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
+                                     Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
                                      int numberOfIterations, double threshold, double confidence) {
     std::size_t numberOfAssociatedPoints = u1d.cols();
+    double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
+    u1d.row(0) = u1d.row(0) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
+
+    u1d.row(1) = u1d.row(1) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
+
+    u2d.row(0) = u2d.row(0) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
+
+    u2d.row(1) = u2d.row(1) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
+    u1d = u1d / r;
+    u2d = u2d / r;
+    threshold = 5 * threshold / r;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::vector<std::size_t> numbers(numberOfAssociatedPoints);
     std::iota(numbers.begin(), numbers.end(), 0);
     std::size_t maxGoodPoints = 0;
     double minErr = 1e9;
+    std::fstream lmb_d(name_f, std::fstream::app);
     for (std::size_t k = 0; k < numberOfIterations; ++k) {
         std::cout << "\r" << 100 * double(k) / double(numberOfIterations) << "% completed: " << numberOfIterations;
         std::cout.flush();
@@ -658,12 +668,14 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
 
 
         for (std::size_t i = 0; i < count; ++i) {
+            if (models.second[i] >= 0.25)
+                continue;
 
             double hyp_lambda = models.second[i];
             Eigen::Matrix3d hyp_F = models.first[i];
             double modelErr = 0;
-
-            std::size_t good = computeGoodPoints(u1d, u2d, hyp_lambda, hyp_F, threshold,
+            lmb_d << hyp_lambda << "\n";
+            /*std::size_t good = computeGoodPoints(u1d, u2d, w, h, hyp_lambda, hyp_F, threshold,
                                                  modelErr);
 
             numberOfIterations = updateNumberofIters(confidence, (double) (numberOfAssociatedPoints - good) /
@@ -675,8 +687,16 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                 maxGoodPoints = good;
                 minErr = modelErr;
             }
+            */
         }
     }
+    u1d.row(0) = r * u1d.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
+
+    u1d.row(1) = r * u1d.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
+
+    u2d.row(0) = r * u2d.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
+
+    u2d.row(1) = r * u2d.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
     return maxGoodPoints;
 }
 

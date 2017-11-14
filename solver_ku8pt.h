@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <limits>
+
 const double EPS = 1e-8;
 typedef Eigen::Matrix<double, 7, 1> G_polynomial;
 typedef Eigen::Matrix<double, 2, 8> EightPoints;
@@ -23,11 +24,14 @@ PairOfMatricesFandLambdas run_solver8pt(EightPoints &u1d, EightPoints &u2d);
 
 size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
-                                     Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
-                                     Eigen::Matrix3d &F, double &Lambda,
+                                     Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
+                                     Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
                                      int numberOfIterations, double threshold = 1, double confidence = 0.99);
+
 std::size_t updateNumberofIters(double confidence, double error_prob, std::size_t n_points, std::size_t n_iters);
-size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
+
+size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
                          double hyp_lambda, Eigen::Matrix3d &hyp_F, double threshold,
                          double &modelErr);
+
 #endif //AUTOMATICSOLVER_SOLVER_KU8PT_H
