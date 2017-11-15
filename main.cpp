@@ -30,8 +30,8 @@ int main(int argc, char *argv[]) {
     double w = 7360.0, h = 4912.0, r;
     std::string input1, input2, distr_f;
     int iter = 10000;
-    double tr = 5;
-    double tr2 = -5;
+    double tr = 0.25;
+    double tr2 = -1;
     namespace po = boost::program_options;
     try {
         // clang-format off
