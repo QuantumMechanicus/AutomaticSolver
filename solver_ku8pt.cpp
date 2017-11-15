@@ -633,9 +633,12 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
                                      Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
                                      Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
-                                     int numberOfIterations, double threshold, double confidence) {
+                                     int numberOfIterations, double threshold, double threshold2, double confidence) {
     std::size_t numberOfAssociatedPoints = u1d.cols();
     double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
+    if (r == 0) {
+        r = 1;
+    }
     u1d.row(0) = u1d.row(0) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
 
     u1d.row(1) = u1d.row(1) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
@@ -645,7 +648,6 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
     u2d.row(1) = u2d.row(1) - Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
     u1d = u1d / r;
     u2d = u2d / r;
-    threshold = 5 * threshold / r;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::vector<std::size_t> numbers(numberOfAssociatedPoints);
@@ -654,7 +656,7 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
     double minErr = 1e9;
     std::fstream lmb_d(name_f, std::fstream::app);
     for (std::size_t k = 0; k < numberOfIterations; ++k) {
-        std::cout << "\r" << 100 * double(k) / double(numberOfIterations) << "% completed: " << numberOfIterations;
+        std::cout << "\r" <<100 * double(k) / double(numberOfIterations) << "% completed: " << numberOfIterations;
         std::cout.flush();
         std::shuffle(numbers.begin(), numbers.end(), gen);
         EightPoints subsetQ1, subsetQ2;
@@ -668,7 +670,7 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
 
 
         for (std::size_t i = 0; i < count; ++i) {
-            if (models.second[i] >= 0.25)
+            if (models.second[i] > threshold or models.second[i] < threshold2)
                 continue;
 
             double hyp_lambda = models.second[i];

@@ -26,7 +26,7 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
                                      Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
                                      Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
-                                     int numberOfIterations, double threshold = 1, double confidence = 0.99);
+                                     int numberOfIterations, double threshold = 1, double threshold2 = -1, double confidence = 0.99);
 
 std::size_t updateNumberofIters(double confidence, double error_prob, std::size_t n_points, std::size_t n_iters);
 

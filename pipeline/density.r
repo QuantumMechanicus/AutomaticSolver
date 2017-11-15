@@ -5,6 +5,10 @@ if (length(args)==0) {
   args[2] = "estimated_lambda"
 }
 x <- as.matrix(read.csv(args[1], header = F))
+x <- sort(x)
+l <- length(x)
+alpha <- 0.025
+x <- x[round(alpha*l):round((1-alpha)*l)]
 dmode <- function(x) {
       den <- density(x, kernel=c("gaussian"))
         ( den$x[den$y==max(den$y)] )

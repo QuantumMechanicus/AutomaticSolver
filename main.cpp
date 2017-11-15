@@ -30,7 +30,8 @@ int main(int argc, char *argv[]) {
     double w = 7360.0, h = 4912.0, r;
     std::string input1, input2, distr_f;
     int iter = 10000;
-    double tr = 1;
+    double tr = 5;
+    double tr2 = -5;
     namespace po = boost::program_options;
     try {
         // clang-format off
@@ -43,7 +44,8 @@ int main(int argc, char *argv[]) {
                  "Input filename2 (matches and camera parameters)")
                 ("f", po::value<std::string>(&distr_f)->required(),
                         "Output file for lambdas")
-                ("treshold", po::value<double>(&tr), "RANSAC threshold")
+                ("threshold1", po::value<double>(&tr), "Lambda threshold")
+                ("threshold2", po::value<double>(&tr2), "Lambda threshold")
                 ("iters", po::value<int>(&iter), "Number of iterations")
                 ("w", po::value<double>(&w), "Width")
                 ("h", po::value<double>(&h), "Height");
@@ -62,6 +64,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error: " << e.what() << std::endl;
         return -2;
     }
+
     Eigen::Matrix<double, 2, Eigen::Dynamic> u1d, u2d;
     readPointsFromFile(input1, u1d);
     readPointsFromFile(input2, u2d);
@@ -69,8 +72,8 @@ int main(int argc, char *argv[]) {
     Eigen::Matrix3d F;
     double Lambda;
 
-    size_t inl = getFundamentalMatrixAndLambda(u1d, u2d, w, h, F, Lambda, distr_f, iter, tr);
-
+    size_t inl = getFundamentalMatrixAndLambda(u1d, u2d, w, h, F, Lambda, distr_f, iter, tr, tr2);
+    std::cout << std::endl;
     /*std::fstream output_f(input1 + "_results", std::fstream::app);
     output_f << "\n" << inl << " - number of inliesrs \n" << Lambda << " - lambda\n\nF:\n\n" << F << std::endl;
 
