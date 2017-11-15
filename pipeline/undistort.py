@@ -25,14 +25,15 @@ def undistort(img_path, d_lambda, is_full):
 
     dst = cv2.remap(img, map_x, map_y, cv2.INTER_LINEAR)
     name_with_extension = os.path.basename(img_path)
+    input_directory = os.path.split(os.path.dirname(img_path))[1]
     name = os.path.splitext(name_with_extension)[0]
     if (is_full <= 0):
-        out_directory ='./undistorted_images/'
+        out_directory ='./undistorted_images/{}/'.format(input_directory)
     else:
-        out_directory ='./full_undistorted_images/'
+        out_directory ='./full_undistorted_images/{}/'.format(input_directory)
 
     if (not os.path.exists(out_directory )):
-        os.mkdir(out_directory )
+        os.mkdir(out_directory)
 
     undist_img_path = '{}{}_undistorted_k0_is_{:0.6f}.jpg'.format(out_directory, name, d_lambda)
     print('Output file path: ' + undist_img_path)
@@ -40,6 +41,7 @@ def undistort(img_path, d_lambda, is_full):
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description='Undistort image')
     parser.add_argument('--coeff', dest='distort_coeff', type=str, required=True)
     parser.add_argument('--img', dest='img_path', type=str, required=True)
@@ -47,3 +49,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print('Undistortion with parameter: ' + str(args.distort_coeff))
     undistort(args.img_path, float(args.distort_coeff), args.is_full_out)
+
