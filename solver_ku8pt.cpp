@@ -558,10 +558,21 @@ PairOfMatricesFandLambdas run_solver8pt(EightPoints &u1d, EightPoints &u2d) {
 
 size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
                          double w, double h,
-                         double hyp_lambda, Eigen::Matrix3d &hyp_F, double threshold,
-                         double &modelErr) {
-    hyp_F.transposeInPlace();
+                         double hyp_lambda, Eigen::Matrix3d &hyp_F) {
+
     double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
+    double d = std::max(h, w);
+    double alpha = 4/(4+hyp_lambda*(d/r)*(d/r));
+    alpha = 1.0/alpha;
+    Eigen::Matrix3d shift;
+    Eigen::Matrix3d scale;
+    shift << 1, 0, -w / 2.0,
+            0, 1, -h / 2.0,
+            0, 0, 1;
+    scale << 1.0/(alpha*r), 0, 0,
+            0, 1.0/(alpha*r), 0,
+            0, 0, 1;
+    Eigen::Matrix3d recompute_F = shift.transpose()*scale.transpose()*hyp_F*scale*shift;
     Eigen::Matrix<double, 2, Eigen::Dynamic> r1d;
     r1d.resize(Eigen::NoChange, u1d.cols());
     r1d.row(0) = (u1d.row(0).cwiseProduct(u1d.row(0)) + u1d.row(1).cwiseProduct(u1d.row(1)));
@@ -579,23 +590,24 @@ size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::M
     ones.setOnes();
     modelErr = 0;
     size_t goods = 0;
-    auto u1 = u1d.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
-    auto u2 = u2d.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
+    auto u1 = r*alpha*u1d.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
+    auto u2 = r*alpha*u2d.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
 
     Eigen::Matrix<double, 3, Eigen::Dynamic> uu1, uu2;
     uu1.resize(Eigen::NoChange, u1.cols());
     uu2.resize(Eigen::NoChange, u2.cols());
     uu1.setOnes();
     uu2.setOnes();
-    uu1.row(0) = u1.row(0);
-    uu2.row(0) = u2.row(0);
+    uu1.row(0) = u1.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;;
+    uu2.row(0) = u2.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;;
 
-    uu1.row(1) = u1.row(1);
-    uu2.row(1) = u2.row(1);
+    uu1.row(1) = u1.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;;
+    uu2.row(1) = u2.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;;
 
 
-    Eigen::Matrix<double, 3, Eigen::Dynamic> l1 = (hyp_F * uu1);
-    Eigen::Matrix<double, 3, Eigen::Dynamic> l2 = (hyp_F.transpose() * uu2);
+    Eigen::Matrix<double, 3, Eigen::Dynamic> l1 = (recompute_F * uu1);
+    Eigen::Matrix<double, 3, Eigen::Dynamic> l2 = (recompute_F.transpose() * uu2);
+
 
 
     for (size_t k = 0; k < u1d.cols(); ++k) {
@@ -633,7 +645,7 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
                                      Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
                                      Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
-                                     int numberOfIterations, double threshold, double threshold2, double confidence) {
+                                     int numberOfIterations, double threshold, double threshold2, double ransacThreshold, double confidence) {
     std::size_t numberOfAssociatedPoints = u1d.cols();
     double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
     if (r == 0) {
@@ -677,7 +689,7 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
             Eigen::Matrix3d hyp_F = models.first[i];
             double modelErr = 0;
             lmb_d << hyp_lambda << "\n";
-            /*std::size_t good = computeGoodPoints(u1d, u2d, w, h, hyp_lambda, hyp_F, threshold,
+            std::size_t good = computeGoodPoints(u1d, u2d, w, h, hyp_lambda, hyp_F, ransacThreshold,
                                                  modelErr);
 
             numberOfIterations = updateNumberofIters(confidence, (double) (numberOfAssociatedPoints - good) /
@@ -689,7 +701,7 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                 maxGoodPoints = good;
                 minErr = modelErr;
             }
-            */
+
         }
     }
     u1d.row(0) = r * u1d.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
@@ -701,4 +713,3 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
     u2d.row(1) = r * u2d.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
     return maxGoodPoints;
 }
-
