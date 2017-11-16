@@ -22,16 +22,16 @@ PairOfMatricesFandLambdas solver_ku8pt(G_polynomial &g1, G_polynomial &g2, G_pol
 
 PairOfMatricesFandLambdas run_solver8pt(EightPoints &u1d, EightPoints &u2d);
 
-size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
+double getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
                                      Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
                                      Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
-                                     int numberOfIterations, double threshold = 0.25, double threshold2 = -1, double confidence = 0.99);
+                                     int numberOfIterations, double threshold = 0.25, double threshold2 = -1);
 
 std::size_t updateNumberofIters(double confidence, double error_prob, std::size_t n_points, std::size_t n_iters);
 
-size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
-                         double hyp_lambda, Eigen::Matrix3d &hyp_F, double threshold,
-                         double &modelErr);
+double estimateQuantile(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
+                        double w, double h,
+                        double hyp_lambda, Eigen::Matrix3d &hyp_F);
 
 #endif //AUTOMATICSOLVER_SOLVER_KU8PT_H

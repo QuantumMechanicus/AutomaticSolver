@@ -556,9 +556,9 @@ PairOfMatricesFandLambdas run_solver8pt(EightPoints &u1d, EightPoints &u2d) {
     return solver_ku8pt(g1, g2, g3, g4, g5, g6, g7, g8);
 }
 
-size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
-                         double w, double h,
-                         double hyp_lambda, Eigen::Matrix3d &hyp_F) {
+double estimateQuantile(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d,
+                        double w, double h,
+                        double hyp_lambda, Eigen::Matrix3d &hyp_F) {
 
     double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
     double d = std::max(h, w);
@@ -588,8 +588,7 @@ size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::M
     Eigen::Matrix<double, 2, Eigen::Dynamic> ones;
     ones.resize(Eigen::NoChange, r1d.cols());
     ones.setOnes();
-    modelErr = 0;
-    size_t goods = 0;
+
     auto u1 = r*alpha*u1d.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
     auto u2 = r*alpha*u2d.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
 
@@ -609,18 +608,17 @@ size_t computeGoodPoints(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::M
     Eigen::Matrix<double, 3, Eigen::Dynamic> l2 = (recompute_F.transpose() * uu2);
 
 
-
+    std::vector<double> err_sample;
+    err_sample.resize(u1d.cols());
     for (size_t k = 0; k < u1d.cols(); ++k) {
         double c1 = l1.col(k).template topRows<2>().norm();
         double c2 = l2.col(k).template topRows<2>().norm();
         double err = std::abs(uu2.col(k).dot(l1.col(k)) / c1) + std::abs(uu1.col(k).dot(l2.col(k)) / c2);
-
-        if (std::abs(err) < threshold)
-            ++goods;
-        modelErr += err;
+        err_sample[k] = err;
     }
-
-    return goods;
+    std::nth_element(err_sample.begin(), err_sample.begin() + err_sample.size()/10, err_sample.end());
+    double quantile = err_sample[err_sample.size()/10];
+    return quantile;
 }
 
 std::size_t updateNumberofIters(double confidence, double error_prob, std::size_t n_points, std::size_t n_iters) {
@@ -641,11 +639,11 @@ std::size_t updateNumberofIters(double confidence, double error_prob, std::size_
                                n_iters : std::round(num / denom));
 }
 
-size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
+double getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
                                      &u1d,
                                      Eigen::Matrix<double, 2, Eigen::Dynamic> &u2d, double w, double h,
                                      Eigen::Matrix3d &F, double &Lambda, const std::string &name_f,
-                                     int numberOfIterations, double threshold, double threshold2, double ransacThreshold, double confidence) {
+                                     int numberOfIterations, double threshold, double threshold2) {
     std::size_t numberOfAssociatedPoints = u1d.cols();
     double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
     if (r == 0) {
@@ -664,9 +662,10 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
     std::mt19937 gen(rd());
     std::vector<std::size_t> numbers(numberOfAssociatedPoints);
     std::iota(numbers.begin(), numbers.end(), 0);
-    std::size_t maxGoodPoints = 0;
-    double minErr = 1e9;
+
+    double min_quantile = std::numeric_limits<double>::max();
     std::fstream lmb_d(name_f, std::fstream::app);
+    std::fstream ql("ql.txt", std::fstream::app);
     for (std::size_t k = 0; k < numberOfIterations; ++k) {
         std::cout << "\r" <<100 * double(k) / double(numberOfIterations) << "% completed: " << numberOfIterations;
         std::cout.flush();
@@ -687,19 +686,17 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
 
             double hyp_lambda = models.second[i];
             Eigen::Matrix3d hyp_F = models.first[i];
-            double modelErr = 0;
-            lmb_d << hyp_lambda << "\n";
-            std::size_t good = computeGoodPoints(u1d, u2d, w, h, hyp_lambda, hyp_F, ransacThreshold,
-                                                 modelErr);
 
-            numberOfIterations = updateNumberofIters(confidence, (double) (numberOfAssociatedPoints - good) /
-                                                                 numberOfAssociatedPoints, (std::size_t) 8,
-                                                     numberOfIterations);
-            if (good > maxGoodPoints || (good == maxGoodPoints && modelErr < minErr)) {
-                F = hyp_F;
+            lmb_d << hyp_lambda << "\n";
+            double quantile = estimateQuantile(u1d, u2d, w, h, hyp_lambda, hyp_F);
+            if (quantile < min_quantile)
+            {
+                ql << "quantile --- "<< quantile << "; lambda --- " << hyp_lambda << std::endl;
+
+                min_quantile = quantile;
                 Lambda = hyp_lambda;
-                maxGoodPoints = good;
-                minErr = modelErr;
+                F = hyp_F;
+
             }
 
         }
@@ -711,5 +708,5 @@ size_t getFundamentalMatrixAndLambda(Eigen::Matrix<double, 2, Eigen::Dynamic>
     u2d.row(0) = r * u2d.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;
 
     u2d.row(1) = r * u2d.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;
-    return maxGoodPoints;
+    return min_quantile;
 }
