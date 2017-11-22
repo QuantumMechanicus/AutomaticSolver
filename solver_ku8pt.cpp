@@ -572,7 +572,7 @@ double estimateQuantile(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Ma
     scale << 1.0/(alpha*r), 0, 0,
             0, 1.0/(alpha*r), 0,
             0, 0, 1;
-    Eigen::Matrix3d recompute_F = shift.transpose()*scale.transpose()*hyp_F*scale*shift;
+    Eigen::Matrix3d recompute_F = scale.transpose()*hyp_F*scale;
     Eigen::Matrix<double, 2, Eigen::Dynamic> r1d;
     r1d.resize(Eigen::NoChange, u1d.cols());
     r1d.row(0) = (u1d.row(0).cwiseProduct(u1d.row(0)) + u1d.row(1).cwiseProduct(u1d.row(1)));
@@ -597,11 +597,11 @@ double estimateQuantile(Eigen::Matrix<double, 2, Eigen::Dynamic> &u1d, Eigen::Ma
     uu2.resize(Eigen::NoChange, u2.cols());
     uu1.setOnes();
     uu2.setOnes();
-    uu1.row(0) = u1.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;;
-    uu2.row(0) = u2.row(0) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * w / 2.0;;
+    uu1.row(0) = u1.row(0);
+    uu2.row(0) = u2.row(0);
 
-    uu1.row(1) = u1.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;;
-    uu2.row(1) = u2.row(1) + Eigen::Matrix<double, 1, Eigen::Dynamic>::Ones(1, u1d.cols()) * h / 2.0;;
+    uu1.row(1) = u1.row(1);
+    uu2.row(1) = u2.row(1);
 
 
     Eigen::Matrix<double, 3, Eigen::Dynamic> l1 = (recompute_F * uu1);

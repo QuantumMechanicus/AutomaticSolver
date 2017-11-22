@@ -2,10 +2,12 @@ import cv2
 import numpy as np
 import argparse
 import os
+
 def undistort(img_path, d_lambda, is_full):
     img = cv2.imread(img_path)
     rows, cols = img.shape[:2]
-
+    d_lambda1 = d_lambda[0]
+    d_lambda2 = d_lambda[1]
     r_img = np.sqrt((rows / 2.0) ** 2 + (cols / 2.0) ** 2)
     m_ind = np.indices((rows, cols), np.double)
     if (is_full <= 0):
@@ -13,15 +15,17 @@ def undistort(img_path, d_lambda, is_full):
     else:
         d = max(rows, cols)
 
-    alpha = 4/(4+d_lambda*(d/r_img)**2)
+    alpha = 4/(4+d_lambda1*(d/r_img)**2 + d_lambda2*(d/r_img)**4)
 
     x_ind = alpha*(m_ind[1, :, :] - cols / 2.0) / (r_img)
     y_ind = alpha*(m_ind[0, :, :] - rows / 2.0) / (r_img)
-    m_r_u = x_ind ** 2 + y_ind ** 2 + 1e-9
+    #m_r_u = x_ind ** 2 + y_ind ** 2 + 1e-9
+    #polyn = np.stack((d_lambda2*m_r_u, np.zeros(m_r_u.shape), d_lambda*m_r_u, -1*np.ones(m_r_u.shape), m_r_u))
 
-    m_r_d = np.divide(1 - np.sqrt(1 - 4 * d_lambda * m_r_u), 2 * d_lambda * np.sqrt(m_r_u))
-    map_x = (r_img* x_ind * (1 + d_lambda * m_r_d ** 2) + cols / 2.0).astype(np.float32)
-    map_y = (r_img* y_ind * (1 + d_lambda * m_r_d ** 2) + rows / 2.0).astype(np.float32)
+    #n_r_d = np.apply_along_axis(np.roots, -1, polyn)
+    #m_r_d = np.divide(1 - np.sqrt(1 - 4 * d_lambda * m_r_u), 2 * d_lambda * np.sqrt(m_r_u))
+    #map_x = (r_img* x_ind * (1 + d_lambda1 * m_r_d ** 2 + d_lambda2 * m_r_d ** 4) + cols / 2.0).astype(np.float32)
+    #map_y = (r_img* y_ind * (1 + d_lambda1 * m_r_d ** 2 + d_lambda2 * m_r_d **4) + rows / 2.0).astype(np.float32)
 
     dst = cv2.remap(img, map_x, map_y, cv2.INTER_LINEAR)
     name_with_extension = os.path.basename(img_path)
