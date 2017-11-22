@@ -216,7 +216,7 @@ public:
             dr_pow *= dr2;
         }
 
-        T alpha = nominator / T(4.0);
+        T alpha = nominator / T(1.0);
         if (nominator <= .0)
             return false;
 
