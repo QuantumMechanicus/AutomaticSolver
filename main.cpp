@@ -207,16 +207,16 @@ public:
         F(2, 2) = T(1.0);
 
         const T &d = std::max(hT, wT);
-        T dr2 = (d / (T(2.0)*r));
+        T dr2 = (d / r);
         dr2 *= dr2;
         T dr_pow = dr2;
-        T nominator (1.0);
+        T nominator (ceres::pow(2, 2*nLambda));
         for (int i = 0; i < nLambda; ++i) {
-            nominator += dr_pow * lambdas[i];
+            nominator += dr_pow * lambdas[i]/ceres::pow(2, 2*i);
             dr_pow *= dr2;
         }
 
-        T alpha = nominator / T(1.0);
+        T alpha = nominator / T(ceres::pow(2, 2*nLambda));
         if (nominator <= .0)
             return false;
 
