@@ -18,7 +18,7 @@ void readPointsFromFile(std::string &name, Eigen::Matrix<double, 2, Eigen::Dynam
         f >> y;
         if (f.eof())
             break;
-        v.emplace_back(std::make_pair(x, y));
+        v.emplace_back(x, y);
     }
     m.resize(Eigen::NoChange, v.size());
     for (size_t k = 0; k < v.size(); ++k) {
@@ -143,6 +143,12 @@ public:
     }
 };
 
+void normalizePoints(auto &points, double w, double h, double r) {
+    points.row(0).array() -= w / 2.0;
+    points.row(1).array() -= h / 2.0;
+    points /= r;
+}
+
 int main(int argc, char *argv[]) {
     double w = 7360.0, h = 4912.0, r;
     std::string input1, input2;
@@ -159,8 +165,8 @@ int main(int argc, char *argv[]) {
         po::options_description desc("Optimization input options");
         desc.add_options()
                 ("help", "Print help message")
-                ("w", po::value<double>(&w), "Width")
-                ("h", po::value<double>(&h), "Height")
+                ("w", po::value<double>(&w)->required(), "Width")
+                ("h", po::value<double>(&h)->required(), "Height")
                 ("n_pic", po::value<int>(&n_f)->required(), "Number of pirctures")
                 ("lambda_f", po::value<std::string>(&f_f)->required(), "File with %n_pic estimated lambdas")
                 ("fund_f", po::value<std::string>(&f_l)->required(), "File with %n_pic estimated fundamental matrices")
@@ -200,6 +206,7 @@ int main(int argc, char *argv[]) {
         Lambda[0] += cur_l;
     }
     Lambda[0] /= n_f;
+    r = std::sqrt(w * w + h * h) / 2.0;
 
 
     ceres::Problem problem;
@@ -218,6 +225,10 @@ int main(int argc, char *argv[]) {
         readPointsFromFile(name1, i1d);
         readPointsFromFile(name2, i2d);
 
+        normalizePoints(i1d, w, h, r);
+        normalizePoints(i2d, w, h, r);
+        std::cout << i1d << std::endl;
+        std::cout << Lambda[0] << std::endl;
         problem.AddParameterBlock(f_ptr, 8);
 
         for (size_t k = 0; k < i1d.cols(); ++k) {
@@ -233,6 +244,10 @@ int main(int argc, char *argv[]) {
             fun->SetNumResiduals(2);
             problem.AddResidualBlock(fun, /*new ceres::HuberLoss(15)*/ nullptr, lambda_ptr,
                                      f_ptr);
+            const double* ptrs[] = {lambda_ptr, f_ptr};
+            double ptrs_res[2];
+            fun->Evaluate(ptrs, ptrs_res, nullptr);
+            std::cout << ptrs_res[0] << " " << ptrs_res[1] << " " << left.transpose() << " " << right.transpose() << std::endl;
             ++residuals;
         }
 

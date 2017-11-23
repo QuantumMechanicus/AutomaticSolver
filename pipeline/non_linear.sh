@@ -11,4 +11,4 @@ find ./ -name "*.l" | sort | xargs -n 1 -I^ cat ^ >> ${out_dir}all.ll
 find ./ -name "*.f" | sort | xargs -n 1 -I^ cat ^ >> ${out_dir}all.ff
 ones=`find $dir -name "points_*_left" | sort | grep -o '[0-9]\+' | sed 's/^\(.*\)$/\1/g' | xargs -n 1 printf ${out_dir}'%s_left '`
 twos=`find $dir -name "points_*_left" | sort | grep -o '[0-9]\+' | sed 's/^\(.*\)$/\1/g' | xargs -n 1 printf ${out_dir}'%s_right '`
-./NonLinearOptimizator --left_inl_f $ones --n_pic 9 --right_inl_f $twos --fund_f ${out_dir}all.ff --lambda_f ${out_dir}all.ll --nlambda 2
+./NonLinearOptimizator --left_inl_f $ones --n_pic 9 --right_inl_f $twos --fund_f ${out_dir}all.ff --lambda_f ${out_dir}all.ll --nlambda 2 --h 4912 --w 7360
