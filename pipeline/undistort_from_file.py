@@ -11,8 +11,8 @@ def undistort(img_path, f_x, f_y):
     #map_x = np.loadtxt(f_x, dtype=np.float32, delimiter=' ')
     #map_yy = np.loadtxt(f_y, dtype=np.float32, delimiter=' ')
 
-    df1 = pd.read_table(f_x, delimiter=',', header=None, dtype=np.float32)
-    df2 = pd.read_table(f_y, delimiter=',',header=None,  dtype=np.float32)
+    df1 = pd.read_table(f_x, delimiter=' ', header=None, dtype=np.float32)
+    df2 = pd.read_table(f_y, delimiter=' ',header=None,  dtype=np.float32)
 
 
     map_x = df1.as_matrix()
