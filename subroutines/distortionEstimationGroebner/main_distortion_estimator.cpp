@@ -25,8 +25,7 @@ bool readPointsFromFile(std::string &name, Eigen::Matrix<double, 2, Eigen::Dynam
         }
         f.close();
         return true;
-    }
-    else
+    } else
         return false;
 }
 
@@ -71,7 +70,6 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error: " << e.what() << std::endl;
         return -2;
     }
-
     Eigen::Matrix<double, 2, Eigen::Dynamic> u1d, u2d;
     readPointsFromFile(input1, u1d);
     readPointsFromFile(input2, u2d);
@@ -92,6 +90,5 @@ int main(int argc, char *argv[]) {
 
     output_f1.close();
     output_f2.close();
-
     return 0;
 }

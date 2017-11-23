@@ -3,8 +3,7 @@ FIND_PACKAGE(Boost COMPONENTS program_options REQUIRED)
 FIND_PACKAGE(Ceres REQUIRED)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
 
-set(SOURCE_FILES main.cpp solver_ku8pt.cpp solver_ku8pt.h)
-add_executable(AutomaticSolver ${SOURCE_FILES})
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/pipeline)
+set(SOURCE_FILES main_non_linear_optimizator.cpp)
+add_executable(NonLinearOptimizator ${SOURCE_FILES})
 
-TARGET_LINK_LIBRARIES(AutomaticSolver ${Boost_LIBRARIES} ${CERES_LIBRARIES})
+TARGET_LINK_LIBRARIES(NonLinearOptimizator ${Boost_LIBRARIES} ${CERES_LIBRARIES})

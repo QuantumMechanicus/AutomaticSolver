@@ -12,9 +12,9 @@
 AutomaticEstimator::AutomaticEstimator(double w, double h, const AutomaticEstimator::Points &u1d,
                                        const AutomaticEstimator::Points &u2d) : w_(w), h_(h) {
     assert(u1d.cols() == u2d.cols() && "Points correspondences must be the same size");
-    double r = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
-    if (r == 0) {
-        r = 1;
+    r_ = std::sqrt((w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0));
+    if (r_ < 1e-8) {
+        r_ = 1;
     }
     u1d_.resize(Eigen::NoChange, u1d.cols());
     u2d_.resize(Eigen::NoChange, u1d.cols());
@@ -27,8 +27,8 @@ AutomaticEstimator::AutomaticEstimator(double w, double h, const AutomaticEstima
     u2d_.row(0) = u2d.row(0) - ones * w_ / 2.0;
 
     u2d_.row(1) = u2d.row(1) - ones * h_ / 2.0;
-    u1d_ = u1d_ / r;
-    u2d_ = u2d_ / r;
+    u1d_ = u1d_ / r_;
+    u2d_ = u2d_ / r_;
 }
 
 
@@ -126,17 +126,17 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
 void
 AutomaticEstimator::computeErrors(double hyp_lambda, const Eigen::Matrix3d &hyp_F, std::vector<double> &left_errors,
                                   std::vector<double> &right_errors) {
-    double r = std::sqrt((w_ / 2.0) * (w_ / 2.0) + (h_ / 2.0) * (h_ / 2.0));
+
     double d = std::max(h_, w_);
-    double alpha = 4 / (4 + hyp_lambda * (d / r) * (d / r));
+    double alpha = 4 / (4 + hyp_lambda * (d / r_) * (d / r_));
     alpha = 1.0 / alpha;
     Eigen::Matrix3d shift;
     Eigen::Matrix3d scale;
     shift << 1, 0, -w_ / 2.0,
             0, 1, -h_ / 2.0,
             0, 0, 1;
-    scale << 1.0 / (alpha * r), 0, 0,
-            0, 1.0 / (alpha * r), 0,
+    scale << 1.0 / (alpha * r_), 0, 0,
+            0, 1.0 / (alpha * r_), 0,
             0, 0, 1;
     Eigen::Matrix3d recompute_F = scale.transpose() * hyp_F * scale;
     Eigen::Matrix<double, 2, Eigen::Dynamic> r1d;
@@ -155,8 +155,8 @@ AutomaticEstimator::computeErrors(double hyp_lambda, const Eigen::Matrix3d &hyp_
     ones.resize(Eigen::NoChange, r1d.cols());
     ones.setOnes();
 
-    auto u1 = r * alpha * u1d_.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
-    auto u2 = r * alpha * u2d_.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
+    auto u1 = r_ * alpha * u1d_.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
+    auto u2 = r_ * alpha * u2d_.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
 
     Eigen::Matrix<double, 3, Eigen::Dynamic> uu1, uu2;
     uu1.resize(Eigen::NoChange, u1.cols());
@@ -205,18 +205,22 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
     std::vector<double> err1, err2;
     computeErrors(hyp_lambda, hyp_F, err1, err2);
     size_t goods = 0;
+
     std::fstream errf(out_name, std::ios_base::out);
     std::fstream errf1(out_name + "_left", std::ios_base::out);
     std::fstream errf2(out_name + "_right", std::ios_base::out);
+    Eigen::Matrix<double, 1, 2> center;
+    center(0,0) = w_/2.0;
+    center(0,1) = h_/2.0;
     double full_err = 0;
     for (size_t k = 0; k < u1d_.cols(); ++k) {
         double err = err1[k] + err2[k];
 
-        if (std::abs(err) < quantile * 5.36752) {
+        if (std::abs(err) < quantile * confidence_interval) {
             full_err += (err1[k] * err1[k] + err2[k] * err2[k]);
             ++goods;
-            errf1 << u1d_.col(k).transpose().leftCols(2) << "\n";
-            errf2 << u2d_.col(k).transpose().leftCols(2) << "\n";
+            errf1 << r_*u1d_.col(k).transpose().leftCols(2) + center << "\n";
+            errf2 << r_*u2d_.col(k).transpose().leftCols(2) + center<<  "\n";
         }
 
     }

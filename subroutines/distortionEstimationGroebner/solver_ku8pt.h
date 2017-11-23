@@ -5,6 +5,8 @@
 #ifndef AUTOMATICSOLVER_SOLVER_KU8PT_H
 #define AUTOMATICSOLVER_SOLVER_KU8PT_H
 
+
+
 #include "Eigen/Dense"
 #include <vector>
 #include <iostream>
@@ -20,7 +22,8 @@ public:
 
 private:
     static constexpr double EPS = 1e-8;
-    double w_, h_;
+    static constexpr double confidence_interval = 5.36752;
+    double w_, h_, r_;
     Points u1d_, u2d_;
 
     PairOfMatricesFandLambdas solver_ku8pt(const G_polynomial &g1, const G_polynomial &g2, const G_polynomial &g3,
