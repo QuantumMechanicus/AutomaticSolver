@@ -68,7 +68,10 @@ AutomaticEstimator::run_solver8pt(EightPoints u1d, EightPoints u2d) {
     G_polynomial g6 = G.row(5);
     G_polynomial g7 = G.row(6);
     G_polynomial g8 = G.row(7);
-
+    std::fstream gs("gs.txt", std::fstream::app);
+    gs << u1d << " \n!!\n " << u2d << " \n " << g1.transpose() << " \n " << g2.transpose()
+       << " \n " << g3.transpose() << " \n " << g4.transpose() << " \n " << g5.transpose()
+       << " \n " << g6.transpose() << " \n " << g7.transpose() << " \n " << g8.transpose()<< std::endl;
     return solver_ku8pt(g1, g2, g3, g4, g5, g6, g7, g8);
 }
 
@@ -76,7 +79,7 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
                                     const std::string &inliers_f, int numberOfIterations,
                                     double threshold, double threshold2) {
     std::size_t numberOfAssociatedPoints = u1d_.cols();
-
+    std::fstream dts("dets.txt", std::fstream::app);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::vector<std::size_t> numbers(numberOfAssociatedPoints);
@@ -95,6 +98,13 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
         subsetQ2 << u2d_.col(numbers[0]), u2d_.col(numbers[1]), u2d_.col(numbers[2]), u2d_.col(
                 numbers[3]), u2d_.col(numbers[4]), u2d_.col(numbers[5]), u2d_.col(numbers[6]), u2d_.col(numbers[7]);
 
+        subsetQ1 <<
+                 0.74925, -0.196845, 0.604549, 0.785098, 0.223787, 0.0612754, -0.738281, 0.722218,
+                -0.244695, -0.0597158, -0.0755828, -0.210429, -0.447866, 0.122076, 0.10144, -0.216713;
+        subsetQ2 <<
+                 0.776599, 0.128156, 0.670616, 0.805011, -0.754503, 0.408246, -0.330358, 0.708611,
+                -0.218792, -0.0433516, -0.0614336, -0.190856, 0.0397126, 0.206948, 0.155505, -0.215673;
+
         PairOfMatricesFandLambdas models = run_solver8pt(subsetQ1, subsetQ2);
         unsigned long count = models.first.size();
 
@@ -107,6 +117,8 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
             Eigen::Matrix3d hyp_F = models.first[i];
 
             lmb_d << hyp_lambda << "\n";
+            dts << "Count is: " << count << "\nF is: \n" << hyp_F << "\nDet is :" << hyp_F.determinant() << "\n L: "
+                << hyp_lambda << "\n SQ1: \n" << subsetQ1 << "\n SQ2: \n" << subsetQ2 << std::endl;
             double quantile = estimateQuantile(hyp_lambda, hyp_F);
             if (quantile < min_quantile) {
 
@@ -210,8 +222,8 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
     std::fstream errf1(out_name + "_left", std::ios_base::out);
     std::fstream errf2(out_name + "_right", std::ios_base::out);
     Eigen::Matrix<double, 1, 2> center;
-    center(0,0) = w_/2.0;
-    center(0,1) = h_/2.0;
+    center(0, 0) = w_ / 2.0;
+    center(0, 1) = h_ / 2.0;
     double full_err = 0;
     for (size_t k = 0; k < u1d_.cols(); ++k) {
         double err = err1[k] + err2[k];
@@ -219,8 +231,8 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
         if (std::abs(err) < quantile * confidence_interval) {
             full_err += (err1[k] * err1[k] + err2[k] * err2[k]);
             ++goods;
-            errf1 << r_*u1d_.col(k).transpose().leftCols(2) + center << "\n";
-            errf2 << r_*u2d_.col(k).transpose().leftCols(2) + center<<  "\n";
+            errf1 << r_ * u1d_.col(k).transpose().leftCols(2) + center << "\n";
+            errf2 << r_ * u2d_.col(k).transpose().leftCols(2) + center << "\n";
         }
 
     }
@@ -690,6 +702,8 @@ AutomaticEstimator::solver_ku8pt(const AutomaticEstimator::G_polynomial &g1, con
             A(arows[i] - 1, j) = -Mres(mrows[i] - 1, 15 - j);
 
         }
+    std::fstream maaa("A.txt", std::fstream::out);
+    maaa << A ;
     Eigen::EigenSolver<Eigen::Matrix<double, 16, 16> > eigen_solver(A);
 
 

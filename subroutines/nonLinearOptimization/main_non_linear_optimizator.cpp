@@ -103,7 +103,7 @@ public:
             return false;
 
 
-        Matrix3T scale;
+        /*Matrix3T scale;
         Matrix3T shift;
         scale.setZero();
         shift.setZero();
@@ -111,10 +111,9 @@ public:
         shift(0, 2) = -wT / T(2.0);
         shift(1, 2) = -hT / T(2.0);
         scale(0, 0) = scale(1, 1) = T(1.0) / (alpha * r);
-        scale(2, 2) = T(1.0);
+        scale(2, 2) = T(1.0);*/
 
-        Matrix3T recompute_F =
-                scale.transpose() * F * scale;
+        Matrix3T recompute_F = F;
 
 
         T r1d, r2d;
@@ -125,8 +124,8 @@ public:
         Vector3T u1, u2;
         T denominator1 = undistortionDenominator(r1d, lambdas);
         T denominator2 = undistortionDenominator(r2d, lambdas);
-        u1 = r * alpha * left_point_T / denominator1;
-        u2 = r * alpha * right_point_T / denominator2;
+        u1 =left_point_T / denominator1;
+        u2 = right_point_T / denominator2;
         u1[2] = u2[2] = T(1.0);
 
         Vector3T l1 = recompute_F * u1;
@@ -137,8 +136,8 @@ public:
         T err = l1.dot(u2);
         T err2 = err * err;
 
-        residuals[0] = err / n1;
-        residuals[1] = err / n2;
+        residuals[0] = alpha*r*err / n1;
+        residuals[1] = alpha*r*err / n2;
         return denominator1 > 0.0 && denominator2 > 0.0;
     }
 };
@@ -168,8 +167,8 @@ int main(int argc, char *argv[]) {
                 ("w", po::value<double>(&w)->required(), "Width")
                 ("h", po::value<double>(&h)->required(), "Height")
                 ("n_pic", po::value<int>(&n_f)->required(), "Number of pirctures")
-                ("lambda_f", po::value<std::string>(&f_f)->required(), "File with %n_pic estimated lambdas")
-                ("fund_f", po::value<std::string>(&f_l)->required(), "File with %n_pic estimated fundamental matrices")
+                ("lambda_f", po::value<std::string>(&f_l)->required(), "File with %n_pic estimated lambdas")
+                ("fund_f", po::value<std::string>(&f_f)->required(), "File with %n_pic estimated fundamental matrices")
                 ("left_inl_f", po::value<std::vector<std::string> >(&vec_names)->multitoken()->required(),
                  "Path to left inliers")
                 ("right_inl_f", po::value<std::vector<std::string> >(&vec_names2)->multitoken()->required(),
