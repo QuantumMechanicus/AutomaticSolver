@@ -98,12 +98,12 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
         subsetQ2 << u2d_.col(numbers[0]), u2d_.col(numbers[1]), u2d_.col(numbers[2]), u2d_.col(
                 numbers[3]), u2d_.col(numbers[4]), u2d_.col(numbers[5]), u2d_.col(numbers[6]), u2d_.col(numbers[7]);
 
-        subsetQ1 <<
+        /*subsetQ1 <<
                  0.74925, -0.196845, 0.604549, 0.785098, 0.223787, 0.0612754, -0.738281, 0.722218,
                 -0.244695, -0.0597158, -0.0755828, -0.210429, -0.447866, 0.122076, 0.10144, -0.216713;
         subsetQ2 <<
                  0.776599, 0.128156, 0.670616, 0.805011, -0.754503, 0.408246, -0.330358, 0.708611,
-                -0.218792, -0.0433516, -0.0614336, -0.190856, 0.0397126, 0.206948, 0.155505, -0.215673;
+                -0.218792, -0.0433516, -0.0614336, -0.190856, 0.0397126, 0.206948, 0.155505, -0.215673;*/
 
         PairOfMatricesFandLambdas models = run_solver8pt(subsetQ1, subsetQ2);
         unsigned long count = models.first.size();
@@ -333,6 +333,10 @@ AutomaticEstimator::solver_ku8pt(const AutomaticEstimator::G_polynomial &g1, con
     c(57) = g1(3) * g4(6) + g1(6) * g4(3) - g2(3) * g3(6) - g2(6) * g3(3) + g2(6) * g8(6) - g4(6) * g6(6);
     c(58) = g1(6) * g4(6) - g2(6) * g3(6);
 
+    std::fstream cc("cc.txt", std::fstream::out);
+    cc << c;
+    std::fstream mm("mm.txt", std::fstream::out);
+    std::fstream mmr("mmref.txt", std::fstream::out);
 
     Eigen::Matrix<double, 32, 48> M = Eigen::Matrix<double, 32, 48>::Zero();
 
@@ -679,13 +683,17 @@ AutomaticEstimator::solver_ku8pt(const AutomaticEstimator::G_polynomial &g1, con
     M(31, 45) = c[56];
     M(31, 44) = c[57];
     M(31, 47) = c[58];
+    mm << M;
+
+    Eigen::FullPivHouseholderQR<Eigen::Matrix<long double, 32, 32>> qr(M.template block<32, 32>(0, 0).cast<long double>());
+    //Eigen::JacobiSVD<Eigen::Matrix<double, 32, 32>> qr(M.template block<32, 32>(0, 0), Eigen::ComputeFullU | Eigen::ComputeFullV);
 
 
-    Eigen::FullPivHouseholderQR<Eigen::Matrix<double, 32, 32>> qr(M.template block<32, 32>(0, 0));
-
-    Eigen::Matrix<double, 32, 16> Mres = qr.solve(M.template block<32, 16>(0, 32));
-
-
+    Eigen::Matrix<long double, 32, 16> Mres = qr.solve(M.template block<32, 16>(0, 32).cast<long double>());
+    /*for (size_t kk = 32; kk < 48; ++kk)
+        mmr << "Norm is: \n"<<(M.template block<32, 32>(0, 0).cast<long double>()*Mres.col(kk-32) - M.col(kk).cast<long double>()).norm()/M.col(kk).cast<long double>().norm() << "\n";
+    mmr <<  Mres;
+    */
     int mrows[10] = {32, 31, 30, 29, 28, 25, 22, 21, 20, 19};
     int arows[10] = {6, 7, 9, 10, 11, 12, 13, 14, 15, 16};
 

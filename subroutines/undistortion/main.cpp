@@ -12,7 +12,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <boost/program_options.hpp>
 
-double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas) {
+double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, 2, 1> &lambdas) {
     double denominator(1.0);
     double r_distorted2_pow = r_distorted2;
     for (int i = 0; i < lambdas.cols(); ++i) {
@@ -79,11 +79,11 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < cols; ++i) {
 #endif
         for (int j = 0; j < rows; ++j) {
-            double ii = (i - cols / 2.0) / r_img / alpha;
-            double jj = (j - rows / 2.0) / r_img / alpha;
-            double r_u = std::sqrt(ii * ii + jj * jj + 1e-7);
-
-            Eigen::VectorXd coeff = Eigen::VectorXd::Zero(2 * n_lambda + 1);
+            long double ii = (i - cols / 2.0) / r_img / alpha;
+            long double jj = (j - rows / 2.0) / r_img / alpha;
+            long double r_u = std::sqrt(ii * ii + jj * jj + 1e-7);
+            std::cout << "\r" << 100 * double(i*cols + j) / double(cols*rows) << "% completed: " << cols*rows;
+            Eigen::Matrix<long double, 5,1> coeff =   Eigen::Matrix<long double, 5,1>::Zero();
 
             for (size_t k = 2 * n_lambda; k >= 2; k -= 2)
                 coeff(k, 0) = r_u * lambdas[k / 2 - 1];
@@ -92,26 +92,26 @@ int main(int argc, char *argv[]) {
             coeff(0, 0) = r_u;
            // std::cout << coeff.transpose() << i << " " << j << std::endl;
 
-            double r_d = std::numeric_limits<double>::max();
-            size_t deg = 0;
+            long double r_d = std::numeric_limits<long double>::max();
+            size_t deg = 2 * n_lambda;
 
-            Eigen::PolynomialSolver<double, Eigen::Dynamic> solver;
-            for (size_t kk = 2 * n_lambda; kk >= 0; --kk) {
+            Eigen::PolynomialSolver<long double, 4> solver;
+            /*for (size_t kk = 2 * n_lambda; kk >= 0; --kk) {
                 if (coeff[kk] != 0) {
                     deg = kk;
                     break;
                 }
-            }
+            }*/
 
-            if (!Eigen::isfinite(coeff.array()).all() or std::abs(coeff[deg]) < 1e-9)
-                std::cout << "A " << coeff;
+            coeff = coeff/coeff[deg];
             solver.compute(coeff.block(0, 0, deg + 1, 1).eval());
-            Eigen::PolynomialSolver<double, Eigen::Dynamic>::RootsType r = solver.roots();
+            Eigen::PolynomialSolver<long double, 4>::RootsType r = solver.roots();
             for (int iii = 0; iii < r.rows(); ++iii) {
                 double real = r[iii].real();
                 double imag = r[iii].imag();
                 if (std::abs(imag) < 1e-9 && real > 0 && r_d > real) {
                     r_d = real;
+                    break;
                 }
 
             }
