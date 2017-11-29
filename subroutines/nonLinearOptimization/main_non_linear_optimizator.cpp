@@ -87,11 +87,17 @@ public:
         Matrix3T F;
         for (size_t k = 0; k < 3; ++k)
             for (size_t j = 0; j < 3; ++j) {
-                if (k < 2 || j < 2) {
                     F(k, j) = f_ptr[3 * j + k];
                 }
             }
-        F(2, 2) = T(1.0);
+
+        /*Eigen::JacobiSVD<Matrix3T> svd(F, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Vector3T singularValues = svd.singularValues();
+        Matrix3T S = Matrix3T::Zero();
+        singularValues /= singularValues(0);
+        singularValues(2) = T(0);
+        S.diagonal() = singularValues;
+        F = svd.matrixU()*S*svd.matrixV().conjugate();*/
 
         const T &d = std::min(hT, wT) / T(2.0);
         T dr = d / r;
@@ -213,7 +219,17 @@ int main(int argc, char *argv[]) {
 
 
     problem.AddParameterBlock(lambda_ptr, nLambda);
+    for (size_t k = 0; k < Fvec.size(); ++k) {
+        //std::cout << Fvec[k] << std::endl;
+        Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
+        singular_values[2] = 0.0;
 
+        Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
+                              fmatrix_svd.matrixV().transpose();
+        //std::cout << Fvec[k] << std::endl;
+        //std::cout << Fvec[k].determinant() << "\n"<< Fvec[k] << "\n\n";
+    }
 
     int residuals = 0;
     for (size_t kk = 0; kk < n_f; ++kk) {
@@ -228,7 +244,7 @@ int main(int argc, char *argv[]) {
         normalizePoints(i2d, w, h, r);
         std::cout << i1d << std::endl;
         std::cout << Lambda[0] << std::endl;
-        problem.AddParameterBlock(f_ptr, 8);
+        problem.AddParameterBlock(f_ptr, 9);
 
         for (size_t k = 0; k < i1d.cols(); ++k) {
             Eigen::Vector3d left, right;
@@ -271,7 +287,9 @@ int main(int argc, char *argv[]) {
     //std::cout << F << std::endl;
     std::cout << Lambda.transpose() << std::endl;
     std::cout << "final residual " << std::sqrt(summary.final_cost / residuals) << " (per point)" << std::endl;
-
+    for (size_t k = 0; k < Fvec.size(); ++k) {
+        std::cout << Fvec[k].determinant() << "\n"<< Fvec[k] << "\n\n";
+    }
 
     return 0;
 }

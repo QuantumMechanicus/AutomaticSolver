@@ -12,10 +12,10 @@
 #include <opencv2/imgcodecs.hpp>
 #include <boost/program_options.hpp>
 
-double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, 2, 1> &lambdas) {
+double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas) {
     double denominator(1.0);
     double r_distorted2_pow = r_distorted2;
-    for (int i = 0; i < lambdas.cols(); ++i) {
+    for (int i = 0; i < lambdas.rows(); ++i) {
         denominator += lambdas[i] * r_distorted2_pow;
         r_distorted2_pow *= r_distorted2;
     }
@@ -62,76 +62,69 @@ int main(int argc, char *argv[]) {
 
     double r_img = std::sqrt(cols * cols / 4.0 + rows * rows / 4.0);
 
-    Eigen::MatrixXd map_x(rows, cols), map_y(rows, cols);
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> map_x(rows, cols), map_y(rows, cols);
 
-    double d = std::max(rows, cols) / 2.0;
+    double d = std::max(rows, cols)/2.0;
     double dr = d / r_img;
     double dr2 = dr * dr;
+    size_t first_non_zero = v_lambdas.size() - 1;
+    while (v_lambdas[first_non_zero] == 0)
+        --first_non_zero;
+    v_lambdas.resize(first_non_zero + 1);
     Eigen::VectorXd lambdas = Eigen::Map<Eigen::VectorXd>(v_lambdas.data(), v_lambdas.size());
     std::cout << lambdas.transpose() << " " << cols << " " << rows << std::endl;
-    double alpha = undistortionDenominator(dr2, lambdas);
+
+    double alpha = undistortionDenominator(dr2, lambdas.cast<double>());
     size_t n_lambda = v_lambdas.size();
+    size_t deg = 2 * n_lambda;
 
-#ifdef PARALLEL
     tbb::parallel_for(tbb::blocked_range<int>(0, cols), [&](auto range) {
+
         for (int i = range.begin(); i != range.end(); ++i) {
-#else
-    for (int i = 0; i < cols; ++i) {
-#endif
-        for (int j = 0; j < rows; ++j) {
-            long double ii = (i - cols / 2.0) / r_img / alpha;
-            long double jj = (j - rows / 2.0) / r_img / alpha;
-            long double r_u = std::sqrt(ii * ii + jj * jj + 1e-7);
-            std::cout << "\r" << 100 * double(i*cols + j) / double(cols*rows) << "% completed: " << cols*rows;
-            Eigen::Matrix<long double, 5,1> coeff =   Eigen::Matrix<long double, 5,1>::Zero();
+            for (int j = 0; j < rows; ++j) {
+                double ii = ((i - cols / 2.0) / r_img)/alpha;
+                double jj = ((j - rows / 2.0) / r_img)/alpha;
+                double r_u = std::sqrt(ii * ii + jj * jj + 1e-7);
+                Eigen::Matrix<double, Eigen::Dynamic, 1> coeff = Eigen::Matrix<double, Eigen::Dynamic, 1>::Zero(
+                        deg + 1);
 
-            for (size_t k = 2 * n_lambda; k >= 2; k -= 2)
-                coeff(k, 0) = r_u * lambdas[k / 2 - 1];
+                for (size_t k = n_lambda; k > 0; --k)
+                    coeff(2 * k, 0) = r_u * lambdas[k - 1];
 
-            coeff(1, 0) = -1;
-            coeff(0, 0) = r_u;
-           // std::cout << coeff.transpose() << i << " " << j << std::endl;
+                coeff(1, 0) = -1;
+                coeff(0, 0) = r_u;
+                double r_d = std::numeric_limits<double>::max();
 
-            long double r_d = std::numeric_limits<long double>::max();
-            size_t deg = 2 * n_lambda;
 
-            Eigen::PolynomialSolver<long double, 4> solver;
-            /*for (size_t kk = 2 * n_lambda; kk >= 0; --kk) {
-                if (coeff[kk] != 0) {
-                    deg = kk;
-                    break;
+                coeff /= coeff[deg];
+                Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> companion(deg, deg);
+                companion.setZero();
+                companion.col(deg - 1) = -1 * coeff.topRows(deg);
+                companion.block(1, 0, deg - 1, deg - 1).setIdentity();
+
+
+                auto r = companion.eigenvalues();
+                for (int kk = 0; kk < r.rows(); ++kk) {
+                    double real = r[kk].real();
+                    double imag = r[kk].imag();
+                    if (std::abs(imag) < 1e-9 && real > 0 && r_d > real) {
+                        r_d = real;
+                        break;
+                    }
+
                 }
-            }*/
-
-            coeff = coeff/coeff[deg];
-            solver.compute(coeff.block(0, 0, deg + 1, 1).eval());
-            Eigen::PolynomialSolver<long double, 4>::RootsType r = solver.roots();
-            for (int iii = 0; iii < r.rows(); ++iii) {
-                double real = r[iii].real();
-                double imag = r[iii].imag();
-                if (std::abs(imag) < 1e-9 && real > 0 && r_d > real) {
-                    r_d = real;
-                    break;
-                }
-
+                double dd = undistortionDenominator(r_d * r_d, lambdas.cast<double>());
+                map_x(j, i) = r_img * ii * dd + cols / 2.0;
+                map_y(j, i) = r_img * jj * dd + rows / 2.0;
             }
-            double dd = undistortionDenominator(r_d * r_d, lambdas);
-            map_x(j, i) = r_img * ii * dd + cols / 2.0;
-            map_y(j, i) = r_img * jj * dd + rows / 2.0;
         }
-    }
-#ifdef PARALLEL
-    });
-#endif
 
+    });
     cv::eigen2cv(map_x.cast<float>().eval(), mx);
     cv::eigen2cv(map_y.cast<float>().eval(), my);
     cv::remap(in, out, mx, my, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
     cv::imwrite(out_path, out);
+    std::cout << "Undistortion've done\n";
 
-#if 0
-    f1 << std::setprecision(16) << std::showpos << map_x;
-    f2 << std::setprecision(16) << std::showpos << map_y;
-#endif
     return 0;
 }
