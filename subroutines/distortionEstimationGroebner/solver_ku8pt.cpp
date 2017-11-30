@@ -105,7 +105,13 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
 
             double hyp_lambda = models.second[i];
             Eigen::Matrix3d hyp_F = models.first[i];
+            Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(hyp_F, Eigen::ComputeFullU | Eigen::ComputeFullV);
+            Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
+            singular_values[2] = 0.0;
 
+            hyp_F = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
+                      fmatrix_svd.matrixV().transpose();
+            hyp_F = hyp_F / hyp_F(2, 2);
             lmb_d << hyp_lambda << "\n";
 
             double quantile = estimateQuantile(hyp_lambda, hyp_F);
@@ -215,8 +221,8 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
     std::fstream errf3(out_name + "_undistorted_left", std::ios_base::out);
     std::fstream errf4(out_name + "_undistorted_right", std::ios_base::out);
     std::fstream errf5(out_name + "_recomp_F", std::ios_base::out);
-    std::fstream errf6(out_name + "_undistorted_left_check", std::ios_base::out);
-    std::fstream errf7(out_name + "_undistorted_right_check", std::ios_base::out);
+    std::fstream errf6(out_name + "_alL_errs", std::ios_base::out);
+    errf6 << u1 << "\n\n";
     Eigen::Matrix<double, 1, 2> center;
     center(0, 0) = w_ / 2.0;
     center(0, 1) = h_ / 2.0;
@@ -224,9 +230,13 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
     double alpha = 4 / (4 + hyp_lambda * (d / r_) * (d / r_));
     alpha = 1.0 / alpha;
     double full_err = 0;
+    errf6 << u1d_ << "\n\n";
+    errf6 << u2d_ << "\n\n";
+
+    errf6 << hyp_lambda << " \n " <<  hyp_F << "\n" << quantile << std::endl;
     for (size_t k = 0; k < u1d_.cols(); ++k) {
         double err = err1[k] + err2[k];
-
+        errf6 << err << "\n";
         if (std::abs(err) < quantile * confidence_interval) {
             full_err += (err1[k] * err1[k] + err2[k] * err2[k]);
             ++goods;
@@ -264,7 +274,7 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
             0, 1.0 / (alpha * r_), 0,
             0, 0, 1;
     Eigen::Matrix3d recompute_F = shift.transpose()*scale.transpose() * hyp_F * scale * shift;
-    errf5 << recompute_F;
+    errf5 << quantile << "\n"<< recompute_F;
     errf << "Number of inliers: " << goods << "\nSquared error: " << full_err << std::endl;
     errf1.close();
     errf2.close();

@@ -9,7 +9,7 @@ namespace po = boost::program_options;
 template<typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
-void readPointsFromFile(std::string &name, Eigen::Matrix<double, 2, Eigen::Dynamic> &m) {
+void readPointsFromFile(const std::string &name, Eigen::Matrix<double, 2, Eigen::Dynamic> &m) {
     std::fstream f(name, std::fstream::in);
     std::vector<std::pair<double, double>> v;
     while (!f.eof()) {
@@ -29,9 +29,9 @@ void readPointsFromFile(std::string &name, Eigen::Matrix<double, 2, Eigen::Dynam
 }
 
 
-double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas) {
-    double denominator(1.0);
-    double r_distorted2_pow = r_distorted2;
+long double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas) {
+    long double denominator(1.0);
+    long double r_distorted2_pow = r_distorted2;
     for (int i = 0; i < lambdas.rows(); ++i) {
         denominator += lambdas[i] * r_distorted2_pow;
         r_distorted2_pow *= r_distorted2;
@@ -188,7 +188,7 @@ size_t findInliers(double w, double h, Eigen::Matrix<double, 2, Eigen::Dynamic> 
     double dr2 = dr * dr;
     double alpha = undistortionDenominator(dr2, lambdas);
 
-
+    std::cout << "Den: " << alpha << " " <<  dr2 << " " << d << " " << r<< std::endl;
 
     Eigen::VectorXd r1d(u1d.cols());
 
@@ -228,6 +228,8 @@ size_t findInliers(double w, double h, Eigen::Matrix<double, 2, Eigen::Dynamic> 
 
     std::fstream errf1(out_name + "_left", std::ios_base::out);
     std::fstream errf2(out_name + "_right", std::ios_base::out);
+    std::fstream errf3(out_name + "all_errs", std::ios_base::out);
+    //errf3 << alpha*r*u1 << "\n\n";
     Eigen::Matrix<double, 1, 2> center;
     center(0, 0) = w / 2.0;
     center(0, 1) = h / 2.0;
@@ -237,17 +239,24 @@ size_t findInliers(double w, double h, Eigen::Matrix<double, 2, Eigen::Dynamic> 
     for (size_t k = 0; k < u1d.cols(); ++k) {
         double c1 = l1.col(k).template topRows<2>().norm();
         double c2 = l2.col(k).template topRows<2>().norm();
+        errf3 << c1 << " " << c2 << "\n\n";
+
         double err1 = alpha * r* std::abs(uu2.col(k).dot(l1.col(k)) / c1);
-        double err2 = alpha * r*std::abs(uu1.col(k).dot(l2.col(k)) / c2);
+        double err2 = alpha * r *std::abs(uu1.col(k).dot(l2.col(k)) / c2);
         err_sample[k] = err1 + err2;
     }
-    std::cout << "W\n";
+
     std::nth_element(err_sample.begin(), err_sample.begin() + err_sample.size() / 10, err_sample.end());
     double quantile = err_sample[err_sample.size() / 10];
+    std::cout << "Quantile --- " << quantile << " " << alpha << " " << r << " " << h << " " << w << std::endl;
     const double confidence_interval = 3.36752;
+    errf3 << u1d << "\n\n";
+    errf3 << u2d << "\n\n";
+
+    errf3 << lambdas.transpose() << "\n" <<  hyp_F << "\n" << quantile << std::endl;
     for (size_t k = 0; k < u1d.cols(); ++k) {
         double err = err_sample[k];
-
+        errf3 << err << "!\n";
         if (std::abs(err) < quantile * confidence_interval) {
             ++goods;
             errf1 << r * u1d.col(k).transpose().leftCols(2) + center << "\n";
@@ -271,7 +280,7 @@ int main(int argc, char *argv[]) {
     std::string f_l;
     std::string f_f;
 
-
+    int non_linear_iter = 2;
     std::vector<std::string> vec_names, left_cor_vec_names;
     std::vector<std::string> vec_names2, right_cor_vec_names;
     namespace po = boost::program_options;
@@ -283,6 +292,7 @@ int main(int argc, char *argv[]) {
                 ("w", po::value<double>(&w)->required(), "Width")
                 ("h", po::value<double>(&h)->required(), "Height")
                 ("n_pic", po::value<int>(&n_f)->required(), "Number of pirctures")
+                ("n_iters", po::value<int>(&non_linear_iter), "Number of iterations")
                 ("lambda_f", po::value<std::string>(&f_l)->required(), "File with %n_pic estimated lambdas")
                 ("fund_f", po::value<std::string>(&f_f)->required(), "File with %n_pic estimated fundamental matrices")
                 ("left_inl_f", po::value<std::vector<std::string> >(&vec_names)->multitoken()->required(),
@@ -309,10 +319,11 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error: " << e.what() << std::endl;
         return -2;
     }
-    const int non_linear_iter = 1;
+
     int nLambda2 = 0;
     Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda(nLambda + nLambda2, 1);
     StdVector<Eigen::Matrix3d> Fvec(n_f);
+    std::vector<double> lmbds(n_f);
     r = std::sqrt(w * w + h * h) / 2.0;
     for (size_t iters = 0; iters < non_linear_iter; ++iters) {
 
@@ -328,26 +339,33 @@ int main(int argc, char *argv[]) {
                 double cur_l;
                 input_f2 >> cur_l;
                 Lambda[0] += cur_l;
+                lmbds[kk] = cur_l;
             }
             Lambda[0] /= n_f;
         }
 
 
-
+        std::cout << "Start lambdas is: " << Lambda.transpose() << std::endl;
         ceres::Problem problem;
         double *lambda_ptr = Lambda.data();
-
+        std::cout << "Start Fs:\n";
 
         problem.AddParameterBlock(lambda_ptr, nLambda + nLambda2);
         for (size_t k = 0; k < Fvec.size(); ++k) {
-            Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
-            Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
-            singular_values[2] = 0.0;
+            if (abs(Fvec[k].determinant()) > 1e-5) {
+                Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
+                Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
+                singular_values[2] = 0.0;
 
-            Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
-                      fmatrix_svd.matrixV().transpose();
-            Fvec[k] = Fvec[k] / Fvec[k](2, 2);
+                Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
+                          fmatrix_svd.matrixV().transpose();
+                Fvec[k] = Fvec[k] / Fvec[k](2, 2);
+                std::cout << Fvec[k] << " \n";
+            }
         }
+
+        std::cout << "Find inliers...\n";
+
 
         int residuals = 0;
         for (size_t kk = 0; kk < n_f; ++kk) {
@@ -355,16 +373,27 @@ int main(int argc, char *argv[]) {
             Eigen::Matrix<double, 2, Eigen::Dynamic> i1d, i2d;
             std::string name1;
             std::string name2;
-            if (iters == 0) {
-                name1 = vec_names[kk];
-                name2 = vec_names2[kk];
+            if (iters < 1) {
+                name1 = left_cor_vec_names[kk];
+                name2 = right_cor_vec_names[kk];
             } else{
-                name1 = std::to_string(kk +1)+"_found_inliers_left";
-                name2 = std::to_string(kk +1)+"_found_inliers_right";
+                name1 = std::to_string(iters) + std::to_string(kk +1)+"_found_inliers_left";
+                name2 = std::to_string(iters) + std::to_string(kk +1)+"_found_inliers_right";
             }
             readPointsFromFile(name1, i1d);
             readPointsFromFile(name2, i2d);
 
+            normalizePoints(i1d, w, h, r);
+            normalizePoints(i2d, w, h, r);
+            std::string out_name =  std::to_string(iters + 1) + std::to_string(kk+1)+"_found_inliers";
+            int inl;
+            if (iters == 0) {
+                Lambda[0] = lmbds[kk];
+            }
+
+            inl = findInliers(w, h, i1d, i2d, Lambda, Fvec[kk], out_name);
+            readPointsFromFile(out_name+"_left", i1d);
+            readPointsFromFile(out_name+"_right", i2d);
             normalizePoints(i1d, w, h, r);
             normalizePoints(i2d, w, h, r);
 
@@ -381,7 +410,7 @@ int main(int argc, char *argv[]) {
                 fun->AddParameterBlock(nLambda + nLambda2);
                 fun->AddParameterBlock(8);
                 fun->SetNumResiduals(2);
-                problem.AddResidualBlock(fun, new ceres::HuberLoss(15), lambda_ptr,
+                problem.AddResidualBlock(fun, nullptr, lambda_ptr,
                                          f_ptr);
 
                 ++residuals;
@@ -407,18 +436,6 @@ int main(int argc, char *argv[]) {
         std::cout << summary.BriefReport() << std::endl;
         std::cout << Lambda.transpose() << std::endl;
         std::cout << "final residual " << std::sqrt(summary.final_cost / residuals) << " (per point)" << std::endl;
-        std::cout << "Find inliers...\n";
-        for (size_t image_n = 0; image_n < n_f; ++image_n) {
-            Eigen::Matrix<double, 2, Eigen::Dynamic> i1d, i2d;
-            readPointsFromFile(left_cor_vec_names[image_n],i1d);
-            readPointsFromFile(right_cor_vec_names[image_n],i2d);
-            normalizePoints(i1d, w, h, r);
-            normalizePoints(i2d, w, h, r);
-
-            std::string out_name = std::to_string(image_n+1)+"_found_inliers";
-            findInliers(w, h, i1d, i2d, Lambda, Fvec[image_n],out_name);
-        }
-
         for (size_t k = 0; k < Fvec.size(); ++k) {
             Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
             Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
@@ -428,6 +445,9 @@ int main(int argc, char *argv[]) {
                       fmatrix_svd.matrixV().transpose();
             Fvec[k] = Fvec[k] / Fvec[k](2, 2);
         }
+
+
+
 
     }
     std::fstream fm("fundamental_matrices", std::fstream::out);

@@ -8,6 +8,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/pipeline)
 set(CMAKE_CXX_STANDARD 14)
 
 
+
 add_subdirectory(subroutines)
 #add_subdirectory(subroutines/distortionEstimationGroebner)
 #add_subdirectory(subroutines/nonLinearOptimization)
