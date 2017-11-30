@@ -22,7 +22,7 @@ public:
 
 private:
     static constexpr double EPS = 1e-8;
-    static constexpr double confidence_interval = 5.36752;
+    static constexpr double confidence_interval = 3.36752;
     double w_, h_, r_;
     Points u1d_, u2d_;
 
@@ -33,7 +33,7 @@ private:
     PairOfMatricesFandLambdas run_solver8pt(EightPoints u1d, EightPoints u2d);
 
     void computeErrors(double hyp_lambda, const Eigen::Matrix3d &hyp_F, std::vector<double> &left_errors,
-                       std::vector<double> &right_errors);
+                       std::vector<double> &right_errors,  Eigen::Matrix<double, 2, Eigen::Dynamic> &u1, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2);
 
     double estimateQuantile(double hyp_lambda, const Eigen::Matrix3d &hyp_F);
 

@@ -126,7 +126,7 @@ double AutomaticEstimator::estimate(Eigen::Matrix3d &F, double &Lambda, const st
 
 void
 AutomaticEstimator::computeErrors(double hyp_lambda, const Eigen::Matrix3d &hyp_F, std::vector<double> &left_errors,
-                                  std::vector<double> &right_errors) {
+                                  std::vector<double> &right_errors, Eigen::Matrix<double, 2, Eigen::Dynamic> &u1, Eigen::Matrix<double, 2, Eigen::Dynamic> &u2) {
 
     double d = std::max(h_, w_);
     double alpha = 4 / (4 + hyp_lambda * (d / r_) * (d / r_));
@@ -156,8 +156,8 @@ AutomaticEstimator::computeErrors(double hyp_lambda, const Eigen::Matrix3d &hyp_
     ones.resize(Eigen::NoChange, r1d.cols());
     ones.setOnes();
 
-    auto u1 = r_ * alpha * u1d_.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
-    auto u2 = r_ * alpha * u2d_.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
+    u1 = r_ * alpha * u1d_.cwiseProduct((ones + hyp_lambda * r1d).cwiseInverse());
+    u2 = r_ * alpha * u2d_.cwiseProduct((ones + hyp_lambda * r2d).cwiseInverse());
 
     Eigen::Matrix<double, 3, Eigen::Dynamic> uu1, uu2;
     uu1.resize(Eigen::NoChange, u1.cols());
@@ -190,7 +190,8 @@ AutomaticEstimator::computeErrors(double hyp_lambda, const Eigen::Matrix3d &hyp_
 
 double AutomaticEstimator::estimateQuantile(double hyp_lambda, const Eigen::Matrix3d &hyp_F) {
     std::vector<double> err1, err2;
-    computeErrors(hyp_lambda, hyp_F, err1, err2);
+    Eigen::Matrix<double, 2, Eigen::Dynamic> u1, u2;
+    computeErrors(hyp_lambda, hyp_F, err1, err2, u1, u2);
     std::vector<double> err_sample;
     err_sample.resize(u1d_.cols());
     for (size_t k = 0; k < u1d_.cols(); ++k) {
@@ -204,15 +205,24 @@ double AutomaticEstimator::estimateQuantile(double hyp_lambda, const Eigen::Matr
 size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d &hyp_F, double quantile,
                                        const std::string &out_name) {
     std::vector<double> err1, err2;
-    computeErrors(hyp_lambda, hyp_F, err1, err2);
+    Eigen::Matrix<double, 2, Eigen::Dynamic> u1, u2;
+    computeErrors(hyp_lambda, hyp_F, err1, err2, u1, u2);
     size_t goods = 0;
 
     std::fstream errf(out_name, std::ios_base::out);
     std::fstream errf1(out_name + "_left", std::ios_base::out);
     std::fstream errf2(out_name + "_right", std::ios_base::out);
+    std::fstream errf3(out_name + "_undistorted_left", std::ios_base::out);
+    std::fstream errf4(out_name + "_undistorted_right", std::ios_base::out);
+    std::fstream errf5(out_name + "_recomp_F", std::ios_base::out);
+    std::fstream errf6(out_name + "_undistorted_left_check", std::ios_base::out);
+    std::fstream errf7(out_name + "_undistorted_right_check", std::ios_base::out);
     Eigen::Matrix<double, 1, 2> center;
     center(0, 0) = w_ / 2.0;
     center(0, 1) = h_ / 2.0;
+    double d = std::max(h_, w_);
+    double alpha = 4 / (4 + hyp_lambda * (d / r_) * (d / r_));
+    alpha = 1.0 / alpha;
     double full_err = 0;
     for (size_t k = 0; k < u1d_.cols(); ++k) {
         double err = err1[k] + err2[k];
@@ -222,9 +232,39 @@ size_t AutomaticEstimator::findInliers(double hyp_lambda, const Eigen::Matrix3d 
             ++goods;
             errf1 << r_ * u1d_.col(k).transpose().leftCols(2) + center << "\n";
             errf2 << r_ * u2d_.col(k).transpose().leftCols(2) + center << "\n";
+            errf3 << u1.col(k).transpose()  + center<< "\n";
+            errf4 << u2.col(k).transpose() + center<< "\n";
+            /*double dux = (u1d_.col(k))(0);
+            double duy = (u1d_.col(k))(1);
+            double rd2 = dux*dux + duy*duy;
+            dux = dux/(1 + hyp_lambda*rd2);
+            duy = duy/(1 + hyp_lambda*rd2);
+
+
+            errf6 << r_*alpha*dux + center(0)<< " " << r_*alpha*duy + center(1) << "\n";
+
+            dux = (u2d_.col(k))(0);
+            duy = (u2d_.col(k))(1);
+            rd2 = dux*dux + duy*duy;
+            dux = dux/(1 + hyp_lambda*rd2);
+            duy = duy/(1 + hyp_lambda*rd2);
+
+            errf7 << r_*alpha*dux + center(0)<< " " << r_*alpha*duy + center(1) << "\n";*/
+
         }
 
     }
+
+    Eigen::Matrix3d shift;
+    Eigen::Matrix3d scale;
+    shift << 1, 0, -w_ / 2.0,
+            0, 1, -h_ / 2.0,
+            0, 0, 1;
+    scale << 1.0 / (alpha * r_), 0, 0,
+            0, 1.0 / (alpha * r_), 0,
+            0, 0, 1;
+    Eigen::Matrix3d recompute_F = shift.transpose()*scale.transpose() * hyp_F * scale * shift;
+    errf5 << recompute_F;
     errf << "Number of inliers: " << goods << "\nSquared error: " << full_err << std::endl;
     errf1.close();
     errf2.close();

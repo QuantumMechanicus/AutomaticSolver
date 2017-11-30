@@ -33,7 +33,7 @@ bool readPointsFromFile(std::string &name, Eigen::Matrix<double, 2, Eigen::Dynam
 int main(int argc, char *argv[]) {
     double w = 7360.0, h = 4912.0, r;
     std::string input1, input2, distr_f = "./automatic_solver_results/lambdas_distribution", f_l = "./automatic_solver_results/estimated_lambda", f_f = "./automatic_solver_results/estimated_f", inliers_f = "./automatic_solver_results/inliers";
-    int iter = 10000;
+    int iter = 50000;
     double lambda_upper_bound = 0.25;
     double lambda_lower_bound = -1;
 
@@ -48,8 +48,8 @@ int main(int argc, char *argv[]) {
                 ("input2", po::value<std::string>(&input2)->required(),
                  "Input filename2 --- second camera points")
                 ("distr_f", po::value<std::string>(&distr_f), "Output file for lambdas distribution")
-                ("low_threshold", po::value<double>(&lambda_upper_bound), "Lambda upper threshold")
-                ("up_threshold", po::value<double>(&lambda_lower_bound), "Lambda lower threshold")
+                ("up_threshold", po::value<double>(&lambda_upper_bound), "Lambda upper threshold")
+                ("low_threshold", po::value<double>(&lambda_lower_bound), "Lambda lower threshold")
                 ("fund_f", po::value<std::string>(&f_f), "Output file for fundamental matrix estimation")
                 ("lambd_f", po::value<std::string>(&f_l), "Output file for lambda estimation")
                 ("iters", po::value<int>(&iter), "Number of iterations")
