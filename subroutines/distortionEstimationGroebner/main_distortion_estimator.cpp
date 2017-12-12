@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     readPointsFromFile(input2, u2d);
     Eigen::Matrix3d F;
     double Lambda;
-    AutomaticEstimator estimator(w, h, u1d, u2d);
+    eight_points_problem::AutomaticEstimator estimator(w, h, u1d, u2d);
     double q = estimator.estimate(F, Lambda, distr_f, inliers_f, iter, lambda_upper_bound, lambda_lower_bound);
 
 

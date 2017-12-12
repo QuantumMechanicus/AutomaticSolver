@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-dir=/home/danielbord/CLionProjects/AutomaticSolver/pipeline/points_correspondence/A
-out_dir=./automatic_solver_results_A/
+dir=/home/danielbord/CLionProjects/AutomaticSolver/pipeline/points_correspondence/B
+out_dir=./automatic_solver_results_B/
 list_l=${out_dir}list.left
 list_r=${out_dir}list.right
 find $dir -name "points_*_left" | sed 's/^\(.*\)$/\1/g' | sort > $list_l
@@ -16,4 +16,4 @@ s_left=$(paste -s $list_l)
 s_right=$(paste -s $list_r)
 s_left="--left_corr_f "${s_left}
 s_right="--right_corr_f "${s_right}
-./NonLinearOptimizator --n_iters 2 $s_left $s_right --left_inl_f $ones --n_pic 9 --right_inl_f $twos --fund_f ${out_dir}all.ff --lambda_f ${out_dir}all.ll --nlambda 2 --h 4912 --w 7360
+./NonLinearOptimizator --n_iters 1 $s_left $s_right --left_inl_f $ones --n_pic 9 --right_inl_f $twos --fund_f ${out_dir}all.ff --lambda_f ${out_dir}all.ll --nlambda 2 --h 4912 --w 7360

@@ -3,6 +3,7 @@
 #include <fstream>
 #include "ceres/ceres.h"
 #include <iostream>
+#include "undistortion_problem_utils.h"
 
 namespace po = boost::program_options;
 
@@ -29,16 +30,6 @@ void readPointsFromFile(const std::string &name, Eigen::Matrix<double, 2, Eigen:
 }
 
 
-long double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas) {
-    long double denominator(1.0);
-    long double r_distorted2_pow = r_distorted2;
-    for (int i = 0; i < lambdas.rows(); ++i) {
-        denominator += lambdas[i] * r_distorted2_pow;
-        r_distorted2_pow *= r_distorted2;
-    }
-    return denominator;
-}
-
 template<typename T>
 double double_cast(const T &t) { return t.a; }
 
@@ -63,20 +54,9 @@ public:
 
 
     template<typename T>
-    T undistortionDenominator(const T &r_distorted2, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas) const {
-        T denominator(1.0);
-        T nominator(1.0);
-        T r_distorted2_pow = r_distorted2;
-        for (int i = 0; i < nLambda; ++i) {
-            denominator += lambdas[i] * r_distorted2_pow;
-            r_distorted2_pow *= r_distorted2;
-        }
-        r_distorted2_pow = r_distorted2;
-        for (int i = 0; i < nLambda2; ++i) {
-            nominator += lambdas[nLambda + i] * r_distorted2_pow;
-            r_distorted2_pow *= r_distorted2;
-        }
-        return denominator / nominator;
+    T undistortionFraction(const T &r_distorted2, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas) const {
+
+        return undistortion_utils::undistortionDenominator<T>(r_distorted2, lambdas.topRows(nLambda));
     }
 
     template<typename T>
@@ -88,8 +68,8 @@ public:
         using Vector3T = Eigen::Matrix<T, 3, 1>;
         using Matrix3T = Eigen::Matrix<T, 3, 3>;
         using VectorNL = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-        Vector3T left_point_T = left_point.cast<T>();
-        Vector3T right_point_T = right_point.cast<T>();
+        Vector2T left_point_T = left_point.topRows(2).cast<T>();
+        Vector2T right_point_T = right_point.topRows(2).cast<T>();
         Vector2T center;
         center[0] = T(w / 2.0);
         center[1] = T(h / 2.0);
@@ -120,52 +100,23 @@ public:
         F = F / F(2, 2);
         //std::cout <<  double_cast(F.determinant()) << " det\n";
 
-        const T &d = std::min(hT, wT) / T(2.0);
+        const T &d = std::max(hT, wT) / T(2.0);
         T dr = d / r;
         T dr2 = dr * dr;
-        T alpha = undistortionDenominator(dr2, lambdas);
+        T alpha = undistortionFraction(dr2, lambdas);
 
 
         if (alpha <= .0)
             return false;
 
+        Vector2T u1, u2;
+        bool is_correct;
+        auto res = undistortion_utils::computeError<T>(lambdas, F, left_point_T, right_point_T, r, w, h, u1, u2,
+                                                       is_correct);
 
-        /*Matrix3T scale;
-        Matrix3T shift;
-        scale.setZero();
-        shift.setZero();
-        shift(0, 0) = shift(1, 1) = shift(2, 2) = T(1.0);
-        shift(0, 2) = -wT / T(2.0);
-        shift(1, 2) = -hT / T(2.0);
-        scale(0, 0) = scale(1, 1) = T(1.0) / (alpha * r);
-        scale(2, 2) = T(1.0);*/
-
-        Matrix3T recompute_F = F;
-
-
-        T r1d, r2d;
-        r1d = (left_point_T.template block<2, 1>(0, 0)).squaredNorm();
-        r2d = (right_point_T.template block<2, 1>(0, 0)).squaredNorm();
-
-
-        Vector3T u1, u2;
-        T denominator1 = undistortionDenominator(r1d, lambdas);
-        T denominator2 = undistortionDenominator(r2d, lambdas);
-        u1 = left_point_T / denominator1;
-        u2 = right_point_T / denominator2;
-        u1[2] = u2[2] = T(1.0);
-
-        Vector3T l1 = recompute_F * u1;
-        Vector3T l2 = recompute_F.transpose() * u2;
-
-        T n1 = l1.template block<2, 1>(0, 0).norm();
-        T n2 = l2.template block<2, 1>(0, 0).norm();
-        T err = l1.dot(u2);
-        T err2 = err * err;
-
-        residuals[0] = alpha * r * err / n1;
-        residuals[1] = alpha * r * err / n2;
-        return denominator1 > 0.0 && denominator2 > 0.0;
+        residuals[0] = res.first;
+        residuals[1] = res.second;
+        return is_correct;
     }
 };
 
@@ -173,102 +124,6 @@ void normalizePoints(auto &points, double w, double h, double r) {
     points.row(0).array() -= w / 2.0;
     points.row(1).array() -= h / 2.0;
     points /= r;
-}
-
-
-size_t findInliers(double w, double h, Eigen::Matrix<double, 2, Eigen::Dynamic> u1d, Eigen::Matrix<double, 2, Eigen::Dynamic> u2d, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas, const Eigen::Matrix3d &hyp_F,
-            const std::string &out_name) {
-
-    Eigen::Matrix<double, 2, Eigen::Dynamic> u1, u2;
-    u1.resize(Eigen::NoChange, u1d.cols());
-    u2.resize(Eigen::NoChange, u2d.cols());
-    double r  = std::sqrt((h/2.0)*(h/2.0) + (w/2.0)*(w/2.0));
-    double d = std::max(h, w) / (2.0);
-    double dr = d / r;
-    double dr2 = dr * dr;
-    double alpha = undistortionDenominator(dr2, lambdas);
-
-    std::cout << "Den: " << alpha << " " <<  dr2 << " " << d << " " << r<< std::endl;
-
-    Eigen::VectorXd r1d(u1d.cols());
-
-    r1d.col(0) = (u1d.row(0).cwiseProduct(u1d.row(0)) + u1d.row(1).cwiseProduct(u1d.row(1))).transpose();
-
-
-    Eigen::VectorXd r2d(u1d.cols());
-
-
-    r2d.col(0) = (u2d.row(0).cwiseProduct(u2d.row(0)) + u2d.row(1).cwiseProduct(u2d.row(1))).transpose();
-
-
-    for (size_t k = 0; k < u1d.cols();++k)
-    {
-        u1.col(k) = u1d.col(k)/undistortionDenominator(r1d[k], lambdas);
-        u2.col(k) = u2d.col(k)/undistortionDenominator(r2d[k], lambdas);
-
-    }
-
-
-    Eigen::Matrix<double, 3, Eigen::Dynamic> uu1, uu2;
-    uu1.resize(Eigen::NoChange, u1.cols());
-    uu2.resize(Eigen::NoChange, u2.cols());
-    uu1.setOnes();
-    uu2.setOnes();
-    uu1.row(0) = u1.row(0);
-    uu2.row(0) = u2.row(0);
-
-    uu1.row(1) = u1.row(1);
-    uu2.row(1) = u2.row(1);
-
-
-    Eigen::Matrix<double, 3, Eigen::Dynamic> l1 = (hyp_F * uu1);
-    Eigen::Matrix<double, 3, Eigen::Dynamic> l2 = (hyp_F.transpose() * uu2);
-
-    size_t goods = 0;
-
-    std::fstream errf1(out_name + "_left", std::ios_base::out);
-    std::fstream errf2(out_name + "_right", std::ios_base::out);
-    std::fstream errf3(out_name + "all_errs", std::ios_base::out);
-    //errf3 << alpha*r*u1 << "\n\n";
-    Eigen::Matrix<double, 1, 2> center;
-    center(0, 0) = w / 2.0;
-    center(0, 1) = h / 2.0;
-    std::vector<double> err_sample(u1d.cols());
-
-
-    for (size_t k = 0; k < u1d.cols(); ++k) {
-        double c1 = l1.col(k).template topRows<2>().norm();
-        double c2 = l2.col(k).template topRows<2>().norm();
-        errf3 << c1 << " " << c2 << "\n\n";
-
-        double err1 = alpha * r* std::abs(uu2.col(k).dot(l1.col(k)) / c1);
-        double err2 = alpha * r *std::abs(uu1.col(k).dot(l2.col(k)) / c2);
-        err_sample[k] = err1 + err2;
-    }
-
-    std::nth_element(err_sample.begin(), err_sample.begin() + err_sample.size() / 10, err_sample.end());
-    double quantile = err_sample[err_sample.size() / 10];
-    std::cout << "Quantile --- " << quantile << " " << alpha << " " << r << " " << h << " " << w << std::endl;
-    const double confidence_interval = 3.36752;
-    errf3 << u1d << "\n\n";
-    errf3 << u2d << "\n\n";
-
-    errf3 << lambdas.transpose() << "\n" <<  hyp_F << "\n" << quantile << std::endl;
-    for (size_t k = 0; k < u1d.cols(); ++k) {
-        double err = err_sample[k];
-        errf3 << err << "!\n";
-        if (std::abs(err) < quantile * confidence_interval) {
-            ++goods;
-            errf1 << r * u1d.col(k).transpose().leftCols(2) + center << "\n";
-            errf2 << r * u2d.col(k).transpose().leftCols(2) + center << "\n";
-        }
-
-    }
-
-    errf1.close();
-    errf2.close();
-
-    return goods;
 }
 
 int main(int argc, char *argv[]) {
@@ -374,28 +229,28 @@ int main(int argc, char *argv[]) {
             std::string name1;
             std::string name2;
             if (iters < 1) {
-                name1 = left_cor_vec_names[kk];
-                name2 = right_cor_vec_names[kk];
-            } else{
-                name1 = std::to_string(iters) + std::to_string(kk +1)+"_found_inliers_left";
-                name2 = std::to_string(iters) + std::to_string(kk +1)+"_found_inliers_right";
+                name1 = vec_names[kk];
+                name2 = vec_names2[kk];
+            } else {
+                name1 = std::to_string(iters) + std::to_string(kk + 1) + "_found_inliers_left";
+                name2 = std::to_string(iters) + std::to_string(kk + 1) + "_found_inliers_right";
             }
             readPointsFromFile(name1, i1d);
             readPointsFromFile(name2, i2d);
 
             normalizePoints(i1d, w, h, r);
             normalizePoints(i2d, w, h, r);
-            std::string out_name =  std::to_string(iters + 1) + std::to_string(kk+1)+"_found_inliers";
+            std::string out_name = std::to_string(iters + 1) + std::to_string(kk + 1) + "_found_inliers";
             int inl;
             if (iters == 0) {
                 Lambda[0] = lmbds[kk];
             }
 
-            inl = findInliers(w, h, i1d, i2d, Lambda, Fvec[kk], out_name);
-            readPointsFromFile(out_name+"_left", i1d);
-            readPointsFromFile(out_name+"_right", i2d);
-            normalizePoints(i1d, w, h, r);
-            normalizePoints(i2d, w, h, r);
+            //inl = findInliers(w, h, i1d, i2d, Lambda, Fvec[kk], out_name);
+            //readPointsFromFile(out_name+"_left", i1d);
+            //readPointsFromFile(out_name+"_right", i2d);
+            //normalizePoints(i1d, w, h, r);
+            //normalizePoints(i2d, w, h, r);
 
             problem.AddParameterBlock(f_ptr, 8);
 
@@ -433,6 +288,7 @@ int main(int argc, char *argv[]) {
         // Solve
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
+
         std::cout << summary.BriefReport() << std::endl;
         std::cout << Lambda.transpose() << std::endl;
         std::cout << "final residual " << std::sqrt(summary.final_cost / residuals) << " (per point)" << std::endl;
@@ -445,12 +301,40 @@ int main(int argc, char *argv[]) {
                       fmatrix_svd.matrixV().transpose();
             Fvec[k] = Fvec[k] / Fvec[k](2, 2);
         }
-
-
+        std::vector<double> residualsf;
+        problem.Evaluate(ceres::Problem::EvaluateOptions(), NULL, &residualsf, NULL, NULL);
+        std::fstream fm("res", std::fstream::out);
+        std::cout << "SZ: " << residualsf.size() << std::endl;
+        for (size_t mm = 0; mm < residualsf.size(); ++mm)
+            fm << residualsf[mm] << "\n";
 
 
     }
     std::fstream fm("fundamental_matrices", std::fstream::out);
+    for (size_t k = 0; k < Fvec.size(); ++k) {
+        Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
+        singular_values[2] = 0.0;
+
+        Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
+                  fmatrix_svd.matrixV().transpose();
+        Fvec[k] = Fvec[k] / Fvec[k](2, 2);
+        Eigen::Matrix3d scale;
+        Eigen::Matrix3d shift;
+        scale.setZero();
+        shift.setZero();
+        shift(0, 0) = shift(1, 1) = shift(2, 2) = (1.0);
+        shift(0, 2) = -w / (2.0);
+        shift(1, 2) = -h / (2.0);
+
+        double d = std::max(h, w) / (2.0);
+        double dr = d / r;
+        double dr2 = dr * dr;
+        double alpha = undistortion_utils::undistortionDenominator(dr2, Lambda);
+        scale(0, 0) = scale(1, 1) = (1.0) / (alpha * r);
+        scale(2, 2) = (1.0);
+        fm << shift.transpose() * scale.transpose() * Fvec[k] * scale * shift << "\n";
+    }
     /*for (size_t kk = 0; kk < n_f; ++kk) {
         double *f_ptr = Fvec[kk].data();
         Eigen::Matrix<double, 2, Eigen::Dynamic> i1d, i2d;

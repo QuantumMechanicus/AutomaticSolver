@@ -1,3 +1,4 @@
 add_subdirectory(distortionEstimationGroebner)
 add_subdirectory(nonLinearOptimization)
 add_subdirectory(undistortion)
+add_subdirectory(utils)
