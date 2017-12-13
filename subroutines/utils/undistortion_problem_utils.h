@@ -8,7 +8,7 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <fstream>
-
+#include <iostream>
 namespace undistortion_utils {
 
     template<typename T>
@@ -19,6 +19,7 @@ namespace undistortion_utils {
             denominator += lambdas[i] * r_distorted2_pow;
             r_distorted2_pow *= r_distorted2;
         }
+
         return denominator;
     }
 
@@ -29,7 +30,7 @@ namespace undistortion_utils {
                  const Eigen::Matrix<T, 2, 1> &u2d, const T &r, double w, double h, Eigen::Matrix<T, 2, 1> &u1,
                  Eigen::Matrix<T, 2, 1> &u2, bool &is_correct) {
         T wT(w), hT(h);
-        T d = std::max(hT, wT)/2.0;
+        T d = std::max(hT, wT)/T(2.0);
         T dr = d / r;
         T dr2 = dr * dr;
         T alpha = undistortionDenominator(dr2, hyp_lambdas);
@@ -43,7 +44,7 @@ namespace undistortion_utils {
         T denominator1 = undistortionDenominator(r1d, hyp_lambdas);
         T denominator2 = undistortionDenominator(r2d, hyp_lambdas);
 
-        is_correct = (denominator1 > T(0) && denominator2 > T(0));
+        is_correct = (denominator1 > 0.0 && denominator2 > 0.0);
         u1 = u1d / denominator1;
         u2 = u2d / denominator2;
         homogeneous_u1 = u1.homogeneous();
@@ -53,8 +54,10 @@ namespace undistortion_utils {
 
         T n1 = l1.template block<2, 1>(0, 0).norm();
         T n2 = l2.template block<2, 1>(0, 0).norm();
-        T err = l1.dot(homogeneous_u1);
+        T err = l1.dot(homogeneous_u2);
         T err2 = err * err;
+        //std::cout << "err " << err2 << " " << denominator1 << " !! " << denominator2  << "\n" << hyp_F << "\n\n" << homogeneous_u1 << "\n" << l1 << "\n" << l2 << std::endl;
+        //exit(0);
         std::pair<T, T> residuals;
         residuals.first = alpha * r * err / n1;
         residuals.second = alpha * r * err / n2;

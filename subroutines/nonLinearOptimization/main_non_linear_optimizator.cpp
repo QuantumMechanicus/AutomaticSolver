@@ -54,7 +54,7 @@ public:
 
 
     template<typename T>
-    T undistortionFraction(const T &r_distorted2, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas) const {
+    T undistortionDenominator(const T &r_distorted2, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas) const {
 
         return undistortion_utils::undistortionDenominator<T>(r_distorted2, lambdas.topRows(nLambda));
     }
@@ -103,9 +103,11 @@ public:
         const T &d = std::max(hT, wT) / T(2.0);
         T dr = d / r;
         T dr2 = dr * dr;
-        T alpha = undistortionFraction(dr2, lambdas);
-
-
+        T alpha = undistortionDenominator(dr2, lambdas);
+        //for (size_t kk = 0; kk < lambdas.size(); ++kk)
+       //     std::cout << lambdas[kk] << " !!! ";
+        //std::cout << "\n" << alpha << "A" << std::endl;
+       // std::cout <<  dr2 << "dr2" << std::endl;
         if (alpha <= .0)
             return false;
 
@@ -175,167 +177,42 @@ int main(int argc, char *argv[]) {
         return -2;
     }
 
-    int nLambda2 = 0;
-    Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda(nLambda + nLambda2, 1);
+    std::fstream input_f1(f_f, std::fstream::in);
+    std::fstream input_f2(f_l, std::fstream::in);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda(nLambda, 1);
+    Lambda.setZero();
     StdVector<Eigen::Matrix3d> Fvec(n_f);
-    std::vector<double> lmbds(n_f);
-    r = std::sqrt(w * w + h * h) / 2.0;
-    for (size_t iters = 0; iters < non_linear_iter; ++iters) {
-
-        if (iters == 0) {
-
-            std::fstream input_f1(f_f, std::fstream::in);
-            std::fstream input_f2(f_l, std::fstream::in);
-            Lambda.setZero();
-            for (size_t kk = 0; kk < n_f; ++kk) {
-                for (int ii = 0; ii < 3; ++ii)
-                    for (int jj = 0; jj < 3; ++jj)
-                        input_f1 >> Fvec[kk](ii, jj);
-                double cur_l;
-                input_f2 >> cur_l;
-                Lambda[0] += cur_l;
-                lmbds[kk] = cur_l;
-            }
-            Lambda[0] /= n_f;
-        }
-
-
-        std::cout << "Start lambdas is: " << Lambda.transpose() << std::endl;
-        ceres::Problem problem;
-        double *lambda_ptr = Lambda.data();
-        std::cout << "Start Fs:\n";
-
-        problem.AddParameterBlock(lambda_ptr, nLambda + nLambda2);
-        for (size_t k = 0; k < Fvec.size(); ++k) {
-            if (abs(Fvec[k].determinant()) > 1e-5) {
-                Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
-                Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
-                singular_values[2] = 0.0;
-
-                Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
-                          fmatrix_svd.matrixV().transpose();
-                Fvec[k] = Fvec[k] / Fvec[k](2, 2);
-                std::cout << Fvec[k] << " \n";
-            }
-        }
-
-        std::cout << "Find inliers...\n";
-
-
-        int residuals = 0;
-        for (size_t kk = 0; kk < n_f; ++kk) {
-            double *f_ptr = Fvec[kk].data();
-            Eigen::Matrix<double, 2, Eigen::Dynamic> i1d, i2d;
-            std::string name1;
-            std::string name2;
-            if (iters < 1) {
-                name1 = vec_names[kk];
-                name2 = vec_names2[kk];
-            } else {
-                name1 = std::to_string(iters) + std::to_string(kk + 1) + "_found_inliers_left";
-                name2 = std::to_string(iters) + std::to_string(kk + 1) + "_found_inliers_right";
-            }
-            readPointsFromFile(name1, i1d);
-            readPointsFromFile(name2, i2d);
-
-            normalizePoints(i1d, w, h, r);
-            normalizePoints(i2d, w, h, r);
-            std::string out_name = std::to_string(iters + 1) + std::to_string(kk + 1) + "_found_inliers";
-            int inl;
-            if (iters == 0) {
-                Lambda[0] = lmbds[kk];
-            }
-
-            //inl = findInliers(w, h, i1d, i2d, Lambda, Fvec[kk], out_name);
-            //readPointsFromFile(out_name+"_left", i1d);
-            //readPointsFromFile(out_name+"_right", i2d);
-            //normalizePoints(i1d, w, h, r);
-            //normalizePoints(i2d, w, h, r);
-
-            problem.AddParameterBlock(f_ptr, 8);
-
-            for (size_t k = 0; k < i1d.cols(); ++k) {
-                Eigen::Vector3d left, right;
-                left.template block<2, 1>(0, 0) = i1d.col(k);
-                right.template block<2, 1>(0, 0) = i2d.col(k);
-                left[2] = right[2] = 1.0;
-
-                auto fun = new ceres::DynamicAutoDiffCostFunction<ErrorFunctor, 10>(
-                        new ErrorFunctor(left, right, w, h, nLambda, nLambda2));
-                fun->AddParameterBlock(nLambda + nLambda2);
-                fun->AddParameterBlock(8);
-                fun->SetNumResiduals(2);
-                problem.AddResidualBlock(fun, nullptr, lambda_ptr,
-                                         f_ptr);
-
-                ++residuals;
-            }
-
-        }
-        std::cout << "Problem size: " << residuals << "points" << std::endl;
-
-
-        ceres::Solver::Options options;
-        //options.max_trust_region_radius = 0.01;
-        options.max_num_iterations = 500;
-        options.linear_solver_type = ceres::DENSE_QR;
-        options.function_tolerance = 1e-16;
-        options.parameter_tolerance = 1e-16;
-        options.minimizer_progress_to_stdout = true;
-        options.preconditioner_type = ceres::IDENTITY;
-        options.jacobi_scaling = false;
-
-        // Solve
-        ceres::Solver::Summary summary;
-        ceres::Solve(options, &problem, &summary);
-
-        std::cout << summary.BriefReport() << std::endl;
-        std::cout << Lambda.transpose() << std::endl;
-        std::cout << "final residual " << std::sqrt(summary.final_cost / residuals) << " (per point)" << std::endl;
-        for (size_t k = 0; k < Fvec.size(); ++k) {
-            Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
-            Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
-            singular_values[2] = 0.0;
-
-            Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
-                      fmatrix_svd.matrixV().transpose();
-            Fvec[k] = Fvec[k] / Fvec[k](2, 2);
-        }
-        std::vector<double> residualsf;
-        problem.Evaluate(ceres::Problem::EvaluateOptions(), NULL, &residualsf, NULL, NULL);
-        std::fstream fm("res", std::fstream::out);
-        std::cout << "SZ: " << residualsf.size() << std::endl;
-        for (size_t mm = 0; mm < residualsf.size(); ++mm)
-            fm << residualsf[mm] << "\n";
-
-
+    for (size_t kk = 0; kk < n_f; ++kk) {
+        for (int ii = 0; ii < 3; ++ii)
+            for (int jj = 0; jj < 3; ++jj)
+                input_f1 >> Fvec[kk](ii, jj);
+        double cur_l;
+        input_f2 >> cur_l;
+        Lambda[0] += cur_l;
     }
-    std::fstream fm("fundamental_matrices", std::fstream::out);
+    Lambda[0] /= n_f;
+    r = std::sqrt(w * w + h * h) / 2.0;
+
+
+    ceres::Problem problem;
+    double *lambda_ptr = Lambda.data();
+
+
+    problem.AddParameterBlock(lambda_ptr, nLambda);
     for (size_t k = 0; k < Fvec.size(); ++k) {
+        //std::cout << Fvec[k] << std::endl;
         Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
         Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
         singular_values[2] = 0.0;
 
         Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
                   fmatrix_svd.matrixV().transpose();
-        Fvec[k] = Fvec[k] / Fvec[k](2, 2);
-        Eigen::Matrix3d scale;
-        Eigen::Matrix3d shift;
-        scale.setZero();
-        shift.setZero();
-        shift(0, 0) = shift(1, 1) = shift(2, 2) = (1.0);
-        shift(0, 2) = -w / (2.0);
-        shift(1, 2) = -h / (2.0);
-
-        double d = std::max(h, w) / (2.0);
-        double dr = d / r;
-        double dr2 = dr * dr;
-        double alpha = undistortion_utils::undistortionDenominator(dr2, Lambda);
-        scale(0, 0) = scale(1, 1) = (1.0) / (alpha * r);
-        scale(2, 2) = (1.0);
-        fm << shift.transpose() * scale.transpose() * Fvec[k] * scale * shift << "\n";
+        //std::cout << Fvec[k] << std::endl;
+        //std::cout << Fvec[k].determinant() << "\n"<< Fvec[k] << "\n\n";
     }
-    /*for (size_t kk = 0; kk < n_f; ++kk) {
+
+    int residuals = 0;
+    for (size_t kk = 0; kk < n_f; ++kk) {
         double *f_ptr = Fvec[kk].data();
         Eigen::Matrix<double, 2, Eigen::Dynamic> i1d, i2d;
         std::string name1 = vec_names[kk];
@@ -345,7 +222,9 @@ int main(int argc, char *argv[]) {
 
         normalizePoints(i1d, w, h, r);
         normalizePoints(i2d, w, h, r);
-        std::cout << i1d << std::endl;
+        std::cout << Lambda[0] << std::endl;
+        problem.AddParameterBlock(f_ptr, 8);
+
         for (size_t k = 0; k < i1d.cols(); ++k) {
             Eigen::Vector3d left, right;
             left.template block<2, 1>(0, 0) = i1d.col(k);
@@ -353,19 +232,44 @@ int main(int argc, char *argv[]) {
             left[2] = right[2] = 1.0;
 
             auto fun = new ceres::DynamicAutoDiffCostFunction<ErrorFunctor, 10>(
-                    new ErrorFunctor(left, right, w, h, nLambda));
+                    new ErrorFunctor(left, right, w, h, nLambda, 0));
             fun->AddParameterBlock(nLambda);
-            fun->AddParameterBlock(9);
+            fun->AddParameterBlock(8);
             fun->SetNumResiduals(2);
-
-            const double* ptrs[] = {lambda_ptr, f_ptr};
+            problem.AddResidualBlock(fun, /*new ceres::HuberLoss(15)*/ nullptr, lambda_ptr,
+                                     f_ptr);
+            const double *ptrs[] = {lambda_ptr, f_ptr};
             double ptrs_res[2];
             fun->Evaluate(ptrs, ptrs_res, nullptr);
-            errr = errr + ptrs_res[0]*ptrs_res[0] +  ptrs_res[1]*ptrs_res[1];
-            //std::cout << ptrs_res[0] << " " << ptrs_res[1]  << std::endl;
-
+            std::cout << ptrs_res[0] << " " << ptrs_res[1] << " " << left.transpose() << " " << right.transpose()
+                      << std::endl;
+            ++residuals;
         }
+
     }
-    std::cout << "Check res: " << errr << std::endl;*/
+    std::cout << "Problem size: " << residuals << "points" << std::endl;
+
+
+    ceres::Solver::Options options;
+    //options.max_trust_region_radius = 0.01;
+    options.max_num_iterations = 500;
+    options.linear_solver_type = ceres::DENSE_QR;
+    options.function_tolerance = 1e-16;
+    options.parameter_tolerance = 1e-16;
+    options.minimizer_progress_to_stdout = true;
+    options.preconditioner_type = ceres::IDENTITY;
+    options.jacobi_scaling = false;
+
+    // Solve
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+    std::cout << summary.BriefReport() << std::endl;
+    //std::cout << F << std::endl;
+    std::cout << Lambda.transpose() << std::endl;
+    std::cout << "final residual " << std::sqrt(summary.final_cost / residuals) << " (per point)" << std::endl;
+    for (size_t k = 0; k < Fvec.size(); ++k) {
+        std::cout << Fvec[k].determinant() << "\n" << Fvec[k] << "\n\n";
+    }
+
     return 0;
 }

@@ -1,0 +1,9 @@
+ --iters 100000 --inliers_f ./automatic_solver_results_A/552 --fund_f ./automatic_solver_results_A/552.f --lambd_f ./automatic_solver_results_A/552.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/553 --fund_f ./automatic_solver_results_A/553.f --lambd_f ./automatic_solver_results_A/553.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/554 --fund_f ./automatic_solver_results_A/554.f --lambd_f ./automatic_solver_results_A/554.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/555 --fund_f ./automatic_solver_results_A/555.f --lambd_f ./automatic_solver_results_A/555.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/556 --fund_f ./automatic_solver_results_A/556.f --lambd_f ./automatic_solver_results_A/556.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/557 --fund_f ./automatic_solver_results_A/557.f --lambd_f ./automatic_solver_results_A/557.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/558 --fund_f ./automatic_solver_results_A/558.f --lambd_f ./automatic_solver_results_A/558.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/559 --fund_f ./automatic_solver_results_A/559.f --lambd_f ./automatic_solver_results_A/559.l
+ --iters 100000 --inliers_f ./automatic_solver_results_A/560 --fund_f ./automatic_solver_results_A/560.f --lambd_f ./automatic_solver_results_A/560.l

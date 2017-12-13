@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-dir=/home/danielbord/CLionProjects/AutomaticSolver/pipeline/points_correspondence/B
-out_dir=./automatic_solver_results_B/
+dir=/home/danielbord/CLionProjects/AutomaticSolver/pipeline/points_correspondence/A
+out_dir=./automatic_solver_results_A/
 list_l=${out_dir}list.left
 list_r=${out_dir}list.right
 find $dir -name "points_*_left" | sed 's/^\(.*\)$/\1/g' | sort > $list_l
