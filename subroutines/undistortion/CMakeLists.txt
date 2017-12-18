@@ -6,5 +6,5 @@ link_directories(${OpenCV_LIBS_DIR})
 include_directories(${OpenCV_INCLUDE_PATH})
 set(CMAKE_BUILD_TYPE Release)
 add_executable(Undistortion main.cpp)
-target_link_libraries(Undistortion tbb ${OpenCV_LIBS} ${Boost_LIBRARIES})
+target_link_libraries(Undistortion tbb ${OpenCV_LIBS} ${Boost_LIBRARIES} UndistortionUtils)
 

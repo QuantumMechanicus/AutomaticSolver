@@ -4,23 +4,14 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/Polynomials>
 #include <iomanip>
-
 #include <tbb/tbb.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <boost/program_options.hpp>
+#include "undistortion_problem_utils.h"
 
-double undistortionDenominator(const double &r_distorted2, const Eigen::Matrix<double, Eigen::Dynamic, 1> &lambdas) {
-    double denominator(1.0);
-    double r_distorted2_pow = r_distorted2;
-    for (int i = 0; i < lambdas.rows(); ++i) {
-        denominator += lambdas[i] * r_distorted2_pow;
-        r_distorted2_pow *= r_distorted2;
-    }
-    return denominator;
-}
 
 int main(int argc, char *argv[]) {
     std::string input_image_name;
@@ -64,9 +55,9 @@ int main(int argc, char *argv[]) {
 
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> map_x(rows, cols), map_y(rows, cols);
 
-    double d = std::max(rows, cols)/2.0;
+    double d = std::max(rows, cols) / 2.0;
     double dr = d / r_img;
-    double dr2 = dr * dr;
+
     size_t first_non_zero = v_lambdas.size() - 1;
     while (v_lambdas[first_non_zero] == 0)
         --first_non_zero;
@@ -74,7 +65,8 @@ int main(int argc, char *argv[]) {
     Eigen::VectorXd lambdas = Eigen::Map<Eigen::VectorXd>(v_lambdas.data(), v_lambdas.size());
     std::cout << lambdas.transpose() << " " << cols << " " << rows << std::endl;
 
-    double alpha = undistortionDenominator(dr2, lambdas.cast<double>());
+    double alpha = undistortion_utils::undistortionDenominator<double>(dr, lambdas.cast<double>());
+
     size_t n_lambda = v_lambdas.size();
     size_t deg = 2 * n_lambda;
 
@@ -82,8 +74,8 @@ int main(int argc, char *argv[]) {
 
         for (int i = range.begin(); i != range.end(); ++i) {
             for (int j = 0; j < rows; ++j) {
-                double ii = ((i - cols / 2.0) / r_img)/alpha;
-                double jj = ((j - rows / 2.0) / r_img)/alpha;
+                double ii = ((i - cols / 2.0) / r_img) / alpha;
+                double jj = ((j - rows / 2.0) / r_img) / alpha;
                 double r_u = std::sqrt(ii * ii + jj * jj + 1e-7);
                 Eigen::Matrix<double, Eigen::Dynamic, 1> coeff = Eigen::Matrix<double, Eigen::Dynamic, 1>::Zero(
                         deg + 1);
@@ -113,7 +105,7 @@ int main(int argc, char *argv[]) {
                     }
 
                 }
-                double dd = undistortionDenominator(r_d * r_d, lambdas.cast<double>());
+                double dd = undistortion_utils::undistortionDenominator<double>(r_d, lambdas.cast<double>());
                 map_x(j, i) = r_img * ii * dd + cols / 2.0;
                 map_y(j, i) = r_img * jj * dd + rows / 2.0;
             }

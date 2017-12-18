@@ -16,4 +16,4 @@ s_left=$(paste -s $list_l)
 s_right=$(paste -s $list_r)
 s_left="--left_corr_f "${s_left}
 s_right="--right_corr_f "${s_right}
-../NonLinearOptimizator --n_iters 1 $s_left $s_right --left_inl_f $ones --n_pic 9 --right_inl_f $twos --fund_f ${out_dir}all.ff --lambda_f ${out_dir}all.ll --nlambda 2 --h 4912 --w 7360
+../NonLinearOptimizator --n_iters 4 $s_left $s_right --left_inl_f $ones --n_pic 9 --right_inl_f $twos --fund_f ${out_dir}all.ff --lambda_f ${out_dir}all.ll --nlambda 2 --nlambda2 1 --h 4912 --w 7360

@@ -38,7 +38,7 @@ namespace eight_points_problem {
 
     public:
 
-        AutomaticEstimator(double w, double h, const Points &u1d, const Points &u2d);
+        AutomaticEstimator(double w, double h, const Points &u1d, const Points &u2d, double prcnt = 0.1);
 
         double estimate(Eigen::Matrix3d &F, double &Lambda, const std::string &lambdas_distribution_file,
                         const std::string &inliers_output_file,

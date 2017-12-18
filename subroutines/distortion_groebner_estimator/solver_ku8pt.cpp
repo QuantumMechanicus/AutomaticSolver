@@ -10,9 +10,9 @@
 
 namespace eight_points_problem {
     AutomaticEstimator::AutomaticEstimator(double w, double h, const AutomaticEstimator::Points &u1d,
-                                           const AutomaticEstimator::Points &u2d) :
+                                           const AutomaticEstimator::Points &u2d, double prcnt) :
             helper_(undistortion_utils::UndistortionProblemHelper<double>(w, h, std::sqrt(
-                    (w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0)), u1d, u2d)) {
+                    (w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0)), u1d, u2d, prcnt)) {
         assert(u1d.cols() == u2d.cols() && "Points correspondences must be the same size");
 
     }
