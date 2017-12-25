@@ -101,7 +101,6 @@ int main(int argc, char *argv[]) {
                     double imag = r[kk].imag();
                     if (std::abs(imag) < 1e-9 && real > 0 && r_d > real) {
                         r_d = real;
-                        break;
                     }
 
                 }

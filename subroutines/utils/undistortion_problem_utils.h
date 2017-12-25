@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <boost/math/special_functions/erf.hpp>
+
 namespace undistortion_utils {
 
     template<typename T>
@@ -82,8 +83,7 @@ namespace undistortion_utils {
     }
 
     template<typename T>
-    T findRoot(const Eigen::Matrix<T, Eigen::Dynamic, 1> &hyp_lambdas,  const Eigen::Matrix<T, 2, 1> &u1d)
-    {
+    T findRoot(const Eigen::Matrix<T, Eigen::Dynamic, 1> &hyp_lambdas, const Eigen::Matrix<T, 2, 1> &u1d) {
         size_t n_lambda = hyp_lambdas.size();
         size_t deg = 2 * n_lambda;
         T r_u = u1d.norm();
@@ -117,12 +117,13 @@ namespace undistortion_utils {
         }
         return r_d;
     }
+
     template<typename T>
     std::pair<T, T>
     computeCurveError(const Eigen::Matrix<T, Eigen::Dynamic, 1> &hyp_lambdas, const Eigen::Matrix<T, 3, 3> &hyp_F,
-                 const Eigen::Matrix<T, 2, 1> &u1d,
-                 const Eigen::Matrix<T, 2, 1> &u2d, const T &r, double w, double h, Eigen::Matrix<T, 2, 1> &u1,
-                 Eigen::Matrix<T, 2, 1> &u2, bool &is_correct) {
+                      const Eigen::Matrix<T, 2, 1> &u1d,
+                      const Eigen::Matrix<T, 2, 1> &u2d, const T &r, double w, double h, Eigen::Matrix<T, 2, 1> &u1,
+                      Eigen::Matrix<T, 2, 1> &u2, bool &is_correct) {
 
 
         T r1d, r2d;
@@ -152,8 +153,8 @@ namespace undistortion_utils {
         std::pair<T, T> residuals;
         residuals.first = err / n1;
         residuals.second = err / n2;
-        line_point1 = u1 + residuals.first*l1.template block<2, 1>(0, 0)/n1;
-        line_point2 = u2 + residuals.second*l1.template block<2, 1>(0, 0)/n1;
+        line_point1 = u1 + residuals.first * l1.template block<2, 1>(0, 0) / n1;
+        line_point2 = u2 + residuals.second * l1.template block<2, 1>(0, 0) / n1;
 
         T r1u = u1.squaredNorm();
         T r2u = u2.squaredNorm();
@@ -162,10 +163,10 @@ namespace undistortion_utils {
         T root_r2d = findRoot<T>(hyp_lambdas, u1);
         T dd = undistortion_utils::undistortionDenominator<T>(r1d, hyp_lambdas);
 
-        curve_point1 = r*dd*u1;
-        curve_point2 = r*dd*u2;
-        residuals.first = (u1d-curve_point1).norm();
-        residuals.second = (u2d-curve_point2).norm();
+        curve_point1 = r * dd * u1;
+        curve_point2 = r * dd * u2;
+        residuals.first = (u1d - curve_point1).norm();
+        residuals.second = (u2d - curve_point2).norm();
         return residuals;
     }
 
@@ -175,7 +176,7 @@ namespace undistortion_utils {
     public:
         typedef Eigen::Matrix<T, 2, Eigen::Dynamic> Points;
         using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
-        static constexpr double EPS = 1e-8;
+        static constexpr double EPS = 1e-10;
     private:
         double prcnt_ = 0.2;
         double confidence_interval_;
@@ -214,11 +215,14 @@ namespace undistortion_utils {
             right_errors.resize(number_of_points_);
             u1_.resize(Eigen::NoChange, number_of_points_);
             u2_.resize(Eigen::NoChange, number_of_points_);
-
+            u1_.setZero();
+            u2_.setZero();
 
             for (size_t k = 0; k < number_of_points_; ++k) {
                 Eigen::Matrix<T, 2, 1> u1k;
                 Eigen::Matrix<T, 2, 1> u2k;
+                u1k.setZero();
+                u2k.setZero();
                 bool is_correct;
                 auto errors = undistortion_utils::computeError<T>(hyp_lambdas_, hyp_F_, u1d_.col(k), u2d_.col(k),
                                                                   r_, w_,
@@ -238,11 +242,12 @@ namespace undistortion_utils {
             std::vector<T> err_sample;
             err_sample.resize(number_of_points_);
             for (size_t k = 0; k < u1d_.cols(); ++k) {
-                err_sample[k] = (err1[k] + err2[k]) / 2.0;
+                err_sample[k] = (err1[k] + err2[k]);
             }
 
-            std::nth_element(err_sample.begin(), err_sample.begin() + int(err_sample.size()*prcnt_), err_sample.end());
-            quantile_ = err_sample[int(err_sample.size()*prcnt_)];
+            std::nth_element(err_sample.begin(), err_sample.begin() + int(err_sample.size() * prcnt_),
+                             err_sample.end());
+            quantile_ = err_sample[int(err_sample.size() * prcnt_)];
 
         }
 
@@ -251,7 +256,10 @@ namespace undistortion_utils {
             if (quantile_ == 0) {
                 estimateQuantile();
             }
-            confidence_interval_ = quantile_*boost::math::erfc_inv((prcnt_ + 1.0))/boost::math::erfc_inv((0.9 + 1.0));
+            confidence_interval_ =
+                    quantile_ * boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((prcnt_ + 1.0));
+
+            std::cout << "conf:" << confidence_interval_ << " " << quantile_ << std::endl;
 
             std::vector<T> err1, err2;
             computeErrors(err1, err2);
@@ -263,30 +271,32 @@ namespace undistortion_utils {
             std::fstream errf3(out_name + "_undistorted_left", std::ios_base::out);
             std::fstream errf4(out_name + "_undistorted_right", std::ios_base::out);
             std::fstream errf5(out_name + "_recomp_F", std::ios_base::out);
-            std::fstream errf6(out_name + "_all_errs", std::ios_base::out);
+            std::fstream errf6(out_name + "_all_errors", std::ios_base::out);
+            std::fstream errf7(out_name + "_unscaled_undistorted_left", std::ios_base::out);
+            std::fstream errf8(out_name + "_unscaled_undistorted_right", std::ios_base::out);
 
             Eigen::Matrix<T, 1, 2> center;
             center(0, 0) = w_ / T(2.0);
             center(0, 1) = h_ / T(2.0);
-            T d = std::max(h_, w_);
+            T d = std::max(h_, w_)/T(2.0);
             T dr = d / r_;
 
             T alpha = undistortionDenominator(dr, hyp_lambdas_);
 
             double full_err = 0;
-            errf6 << "Left distorted points: " << u1d_ << "\n\n";
-            errf6 << "Right distorted points: " << u2d_ << "\n\n";
+            errf6 << "Left distorted points: \n" << u1d_ << "\n\n";
+            errf6 << "Right distorted points: \n" << u2d_ << "\n\n";
             errf6 << "Distortion coefficients: ";
             for (size_t k = 0; k < hyp_lambdas_.size(); ++k)
                 errf6 << hyp_lambdas_[k] << " ";
-            errf6 << "\n Fundamental matrix: " << hyp_F_ << "\n";
-            errf6 << "Quantile: " << quantile_ << "\n";
+            errf6 << "\nFundamental matrix: \n" << hyp_F_ << "\n";
+            errf6 << "Quantile: " << quantile_ << " " << confidence_interval_ << "\n";
             inliers_ind.resize(0);
-
+            //errf3 << "TEST:\n" << center << "\n" << u1_ << "\n";
             for (size_t k = 0; k < u1d_.cols(); ++k) {
-                double err = err1[k] + err2[k];
+                double err = (err1[k] + err2[k]);
                 errf6 << err << "\n";
-                if (std::abs(err) < quantile_ * confidence_interval_) {
+                if (std::abs(err) - quantile_ * confidence_interval_ < EPS) {
                     full_err += (err1[k] * err1[k] + err2[k] * err2[k]);
                     inliers_ind.push_back(k);
                     ++goods;
@@ -294,6 +304,8 @@ namespace undistortion_utils {
                     errf2 << r_ * u2d_.col(k).transpose().leftCols(2) + center << "\n";
                     errf3 << r_ * alpha * u1_.col(k).transpose() + center << "\n";
                     errf4 << r_ * alpha * u2_.col(k).transpose() + center << "\n";
+                    errf7 << u1_.col(k).transpose() << "\n";
+                    errf8 << u2_.col(k).transpose() << "\n";
 
                 }
 
@@ -309,8 +321,10 @@ namespace undistortion_utils {
                     0, 0, 1;
 
             Eigen::Matrix3d recompute_F = shift.transpose() * scale.transpose() * hyp_F_ * scale * shift;
-            errf5 << quantile_ << "\n" << recompute_F;
+            errf5 << recompute_F;
             errf << "Number of inliers: " << goods << "\nSquared error: " << full_err << std::endl;
+            errf7 << std::endl << alpha << std::endl;
+            errf8 << std::endl << alpha << std::endl;
 
             return goods;
         }

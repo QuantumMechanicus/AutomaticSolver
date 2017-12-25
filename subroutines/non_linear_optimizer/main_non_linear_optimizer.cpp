@@ -4,6 +4,7 @@
 #include "ceres/ceres.h"
 #include <iostream>
 #include "undistortion_problem_utils.h"
+#include <boost/math/special_functions/erf.hpp>
 
 namespace po = boost::program_options;
 
@@ -130,7 +131,7 @@ public:
 
 
 int main(int argc, char *argv[]) {
-    double w = 7360.0, h = 4912.0, r;
+    double w = 7360.0, h = 4912.0, prcnt_inl = 0.2, r;
     std::string input1, input2;
     int nLambda, nLambda2;
     int nPictures;
@@ -161,6 +162,7 @@ int main(int argc, char *argv[]) {
                  "Path to left correspondeces")
                 ("right_corr_f", po::value<std::vector<std::string> >(&right_cor_vec_names)->multitoken()->required(),
                  "Path to right correspondeces")
+                ("q", po::value<double>(&prcnt_inl), "quantile to minimize")
                 ("nlambda", po::value<int>(&nLambda)->default_value(1), "Number of parameters in denominator of model")
                 ("nlambda2", po::value<int>(&nLambda2)->default_value(0), "Number of parameters in nominator of model");
 
@@ -236,10 +238,13 @@ int main(int argc, char *argv[]) {
 
 
             std::vector<int> inliers_ind;
-            undistortion_utils::UndistortionProblemHelper<double> helper(w, h, r, u1d, u2d);
+            std::cout << "Prcnt:inl " << prcnt_inl << std::endl;
+            std::cout << "Prcnt:inl " <<  boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((0.3 + 1.0)) << std::endl;
+            std::cout << "Prcnt:inl " <<  boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv(( prcnt_inl+ 1.0)) << std::endl;
+            undistortion_utils::UndistortionProblemHelper<double> helper(w, h, r, u1d, u2d, prcnt_inl);
             helper.setHypLambdas(Lambda);
             helper.setHypF(Fvec[kk]);
-            helper.findInliers("OptimizerResults/non_linear_optimizer_inl_comp", inliers_ind);
+            helper.findInliers("OptimizerResults/non_linear_optimizer_inl_comp" + std::to_string(kk) + "_img_" + std::to_string(iters) + "_iter", inliers_ind);
 
             i1d.resize(Eigen::NoChange, inliers_ind.size());
             i2d.resize(Eigen::NoChange, inliers_ind.size());
@@ -287,7 +292,8 @@ int main(int argc, char *argv[]) {
         ceres::Solver::Options options;
         //options.max_trust_region_radius = 0.01;
         options.max_num_iterations = 500;
-        options.linear_solver_type = ceres::DENSE_QR;
+        options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+        options.num_threads = 8;
         options.function_tolerance = 1e-16;
         options.parameter_tolerance = 1e-16;
         options.minimizer_progress_to_stdout = true;
@@ -306,6 +312,7 @@ int main(int argc, char *argv[]) {
         {
             minimal_residuals_per_points = curr_residual_per_point;
         }
+        std::fstream all_fund_matrices("./OptimizerResults/all_f" + std::to_string(iters) + "_iters", std::fstream::out);
         for (size_t k = 0; k < Fvec.size(); ++k) {
             Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
             Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
@@ -314,6 +321,7 @@ int main(int argc, char *argv[]) {
             Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
                       fmatrix_svd.matrixV().transpose();
             std::cout << Fvec[k].determinant() << "\n" << Fvec[k] << "\n\n";
+            all_fund_matrices << Fvec[k] << std::endl;
         }
     }
     std::cout << "minimal residual " << minimal_residuals_per_points << " (per point)" << std::endl;

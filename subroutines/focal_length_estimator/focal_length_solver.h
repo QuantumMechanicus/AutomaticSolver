@@ -6,46 +6,73 @@
 #define AUTOMATICSOLVER_FOCAL_LENGTH_SOLVER_H
 
 #include <Eigen/Dense>
+#include <iostream>
 
-class FocalLengthEstimator
-{
+class FocalLengthEstimator {
+    static double constexpr scale_focal0 = 1e3;
     Eigen::Matrix3d F;
-    void findEpipoles(Eigen::Vector3d &left_epipole, Eigen::Vector3d &right_epipole)
-    {
+
+private:
+    Eigen::Vector3d makeQuadricEquation() {
         Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(F, Eigen::ComputeFullU | Eigen::ComputeFullV);
-        left_epipole = fmatrix_svd.matrixU().col(2);
-        right_epipole = fmatrix_svd.matrixV().col(2);
+        //std::cout << "SVD:\n" << fmatrix_svd.singularValues().transpose() << std::endl;
+
+        double a, b, u13, u23, v13, v23;
+        a = fmatrix_svd.singularValues()[0];
+        b = fmatrix_svd.singularValues()[1];
+
+        u13 = fmatrix_svd.matrixU()(2, 0);
+        u23 = fmatrix_svd.matrixU()(2, 1);
+        v13 = fmatrix_svd.matrixV()(2, 0);
+        v23 = fmatrix_svd.matrixV()(2, 1);
+
+        Eigen::Vector3d res;
+        res[2] =   a * a * (1 - u13 * u13) * (1 - v13 * v13)
+                 - b * b * (1 - u23 * u23) * (1 - v23 * v23);
+        res[1] =   a * a * (u13 * u13 + v13 * v13 - 2 * u13 * u13 * v13 * v13)
+                 - b * b * (u23 * u23 + v23 * v23 - 2 * u23 * u23 * v23 * v23);
+        res[0] = a * a * u13 * u13 * v13 * v13 - b * b * u23 * u23 * v23 * v23;
+        res = res / res[2];
+
+
+        //double ff2 = (-u23*v13*(a*u13*v13+b*u23*v23))/(a*u13*u23*(1-v13*v13)+b*v13*v23*(1-u23*u23));
+        //std::cout << "FF2: "<< ff2 << " " << 1.0/ff2 << std::endl;
+        return res;
+
 
     }
 
-    void rotateEpipoles(Eigen::Vector3d &left_epipole, Eigen::Vector3d &right_epipole)
-    {
-
-    }
 public:
+    FocalLengthEstimator() {F.setZero();}
+    explicit FocalLengthEstimator(const Eigen::Matrix3d &F) : F(F) {}
 
-    double estimate()
-    {
-        Eigen::Matrix3d recompute_F, left_e, right_e;
-        left_e.setZero();
-        right_e.setZero();
-        left_e(0, 0) = right_epipole(2);
-        left_e(0, 0) = 1;
-        left_e(2, 2) = -right_epipole(0);
+    void setF(const Eigen::Matrix3d &F) {
+        FocalLengthEstimator::F = F;
+    }
 
-        right_e(0, 0) = left_epipole(2);
-        right_e(0, 0) = 1;
-        right_e(2, 2) = -left_epipole(0);
-        //TODO ROTATE EPIPOLES AND F
-        recompute_F = left_e.inverse()*F*right_e.inverse();
-        double a, b, c, d;
-        a = recompute_F(0,0);
-        b = recompute_F(0, 1);
-        c = recompute_F(1, 0);
-        d = recompute_F(1, 1);
-        double k2 = -a*c*left_epipole(0)*left_epipole(0)/(a*c*left_epipole(2)*left_epipole(2) + b*d);
 
-        return sqrt(k2);
+    double estimate() {
+        Eigen::Vector3d coeff = makeQuadricEquation();
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> companion(2, 2);
+        companion.setZero();
+        companion.col(1) = -1 * coeff.topRows(2);
+        companion(1, 0) = 1;
+        //std::cout << coeff.transpose() << std::endl;
+        //std::cout << companion << std::endl;
+        double f2 = 1;
+        auto r = companion.eigenvalues();
+        for (int kk = 0; kk < r.rows(); ++kk) {
+            double real = r[kk].real();
+            double imag = r[kk].imag();
+
+            std::cout << r[kk] << std::endl;
+            if (std::abs(imag) < 1e-9 && real > 0) {
+                f2 = real;
+                break;
+            }
+
+        }
+        return 1.0/std::sqrt(f2);
     }
 };
 

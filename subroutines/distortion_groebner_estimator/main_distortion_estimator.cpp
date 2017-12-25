@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     int iter = 50000;
     double lambda_upper_bound = 0.25;
     double lambda_lower_bound = -1;
-
+    double prcnt_inl = 0.2;
     namespace po = boost::program_options;
     try {
 
@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
                 ("iters", po::value<int>(&iter), "Number of iterations")
                 ("w", po::value<double>(&w), "Width")
                 ("h", po::value<double>(&h), "Height")
+                ("q", po::value<double>(&prcnt_inl), "quantile to minimize")
                 ("inliers_f", po::value<std::string>(&inliers_f), "Output file for inliers");
 
         po::variables_map vm;
@@ -75,7 +76,7 @@ int main(int argc, char *argv[]) {
     readPointsFromFile(input2, u2d);
     Eigen::Matrix3d F;
     double Lambda;
-    eight_points_problem::AutomaticEstimator estimator(w, h, u1d, u2d);
+    eight_points_problem::AutomaticEstimator estimator(w, h, u1d, u2d, prcnt_inl);
     double q = estimator.estimate(F, Lambda, distr_f, inliers_f, iter, lambda_upper_bound, lambda_lower_bound);
 
 
