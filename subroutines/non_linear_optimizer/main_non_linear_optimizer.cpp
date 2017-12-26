@@ -55,7 +55,8 @@ public:
 
 
     template<typename T>
-    T undistortionDenominator(const T &r_distorted, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas2) const {
+    T undistortionDenominator(const T &r_distorted, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas,
+                              const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas2) const {
 
         return undistortion_utils::undistortionDenominator<T>(r_distorted, lambdas, lambdas2);
     }
@@ -120,8 +121,10 @@ public:
 
         Vector2T u1, u2;
         bool is_correct;
-        auto res = undistortion_utils::computeError<T>(lambdas, F, left_point_T, right_point_T, r, w, h, u1, u2,
-                                                       is_correct);
+        auto res = undistortion_utils::computeEpipolarLineDistanceError<T>(lambdas, F, left_point_T, right_point_T, r,
+                                                                           w, h,
+                                                                           u1, u2,
+                                                                           is_correct);
 
         residuals[0] = res.first;
         residuals[1] = res.second;
@@ -237,14 +240,17 @@ int main(int argc, char *argv[]) {
             readPointsFromFile(name2, u2d);
 
 
-            std::vector<int> inliers_ind;
             std::cout << "Prcnt:inl " << prcnt_inl << std::endl;
-            std::cout << "Prcnt:inl " <<  boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((0.3 + 1.0)) << std::endl;
-            std::cout << "Prcnt:inl " <<  boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv(( prcnt_inl+ 1.0)) << std::endl;
+            std::cout << "Prcnt:inl " << boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((0.3 + 1.0))
+                      << std::endl;
+            std::cout << "Prcnt:inl " << boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((prcnt_inl + 1.0))
+                      << std::endl;
             undistortion_utils::UndistortionProblemHelper<double> helper(w, h, r, u1d, u2d, prcnt_inl);
             helper.setHypLambdas(Lambda);
             helper.setHypF(Fvec[kk]);
-            helper.findInliers("OptimizerResults/non_linear_optimizer_inl_comp" + std::to_string(kk) + "_img_" + std::to_string(iters) + "_iter", inliers_ind);
+            helper.findInliers("OptimizerResults/non_linear_optimizer_inl_comp" + std::to_string(kk) + "_img_" +
+                               std::to_string(iters) + "_iter");
+            auto &inliers_ind = helper.getInliersIndices();
 
             i1d.resize(Eigen::NoChange, inliers_ind.size());
             i2d.resize(Eigen::NoChange, inliers_ind.size());
@@ -253,7 +259,7 @@ int main(int argc, char *argv[]) {
                 i2d.col(ll) = u2d.col(inliers_ind[ll]);
             }
 
-           // readPointsFromFile(vec_names[kk], i1d);
+            // readPointsFromFile(vec_names[kk], i1d);
             //readPointsFromFile(vec_names2[kk], i2d);
 
 
@@ -308,11 +314,11 @@ int main(int argc, char *argv[]) {
         std::cout << Lambda.transpose() << " and " << Lambda2.transpose() << std::endl;
         double curr_residual_per_point = std::sqrt(summary.final_cost / residuals);
         std::cout << "final residual " << curr_residual_per_point << " (per point)" << std::endl;
-        if (curr_residual_per_point < minimal_residuals_per_points)
-        {
+        if (curr_residual_per_point < minimal_residuals_per_points) {
             minimal_residuals_per_points = curr_residual_per_point;
         }
-        std::fstream all_fund_matrices("./OptimizerResults/all_f" + std::to_string(iters) + "_iters", std::fstream::out);
+        std::fstream all_fund_matrices("./OptimizerResults/all_f" + std::to_string(iters) + "_iters",
+                                       std::fstream::out);
         for (size_t k = 0; k < Fvec.size(); ++k) {
             Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
             Eigen::Vector3d singular_values = fmatrix_svd.singularValues();

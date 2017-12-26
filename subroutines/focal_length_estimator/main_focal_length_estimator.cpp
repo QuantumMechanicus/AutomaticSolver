@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     double rr =1.663544010175267/2;
 
     std::cout << "al:" <<   undistortion_utils::undistortionDenominator<long double>(rr, lmbd) << std::endl;
-    Eigen::Matrix3d f, k, r, t, f2;
+    Eigen::Matrix3d f, k, k2, r, t, f2;
 
     r = Sophus::SO3d::rotX(0.7).matrix() * Sophus::SO3d::rotY(1.1).matrix();
     t.setZero();
@@ -57,15 +57,20 @@ int main(int argc, char *argv[]) {
     t(2, 1) = tt(0);
 
     k.setZero();
-    k(0, 0) = 5;
-    k(1, 1) = 5;
+    k(0, 0) = 10;
+    k(1, 1) = 10;
     k(2, 2) = 1;
-    f = k * r * t * k;
+
+    k2.setZero();
+    k2(0, 0) = 10;
+    k2(1, 1) = 10;
+    k2(2, 2) = 1;
+    f = k * r * t * k2;
     double fnorm = f.norm();
     f = f / fnorm;
-    std::cout << std::endl << f << std::endl << std::endl;
+    std::cout << std::endl << "F: \n" << f << std::endl << std::endl;
     FocalLengthEstimator est(f);
-    std::cout << est.estimate() << std::endl;
+    std::cout << "Estimated: " << est.estimate() << std::endl;
 
     std::fstream ff("/home/danielbord/CLionProjects/AutomaticSolver/subroutines/focal_length_estimator/testF.txt", std::fstream::in);
 
@@ -83,7 +88,12 @@ int main(int argc, char *argv[]) {
         mf = mf/mf.norm();
         est.setF(mf);
         double est_f = est.estimate();
+
         std::cout << "est f: " << est_f << std::endl;
+        est.setF(mf.transpose());
+        est_f = est.estimate();
+        std::cout << "est f2: " << est_f << std::endl;
+
         k.setZero();
         k(0, 0) = est_f;
         k(1, 1) =est_f;
