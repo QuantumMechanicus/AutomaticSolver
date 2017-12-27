@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-dir=/home/danielbord/CLionProjects/AutomaticSolver/pipeline/points_correspondence/D
-out_dir=../automatic_solver_results_D/
+dir=/home/danielbord/CLionProjects/AutomaticSolver/pipeline/points_correspondence/A
+out_dir=../automatic_solver_results_A/
 list_l=${out_dir}list.left
 list_r=${out_dir}list.right
 numbers=${out_dir}numbers.txt

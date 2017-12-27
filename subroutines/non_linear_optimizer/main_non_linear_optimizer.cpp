@@ -5,6 +5,7 @@
 #include <iostream>
 #include "undistortion_problem_utils.h"
 #include <boost/math/special_functions/erf.hpp>
+#include <unsupported/Eigen/Polynomials>
 
 namespace po = boost::program_options;
 
@@ -42,30 +43,28 @@ class ErrorFunctor {
 private:
     Eigen::Vector3d left_point, right_point;
     double w, h;
-    int nLambda, nLambda2;
+    int nLambda;
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
     ErrorFunctor(const Eigen::Vector3d &left_point, const Eigen::Vector3d &right_point, const double w, const double h,
                  const int nLambda, const int nLambda2)
             : left_point(left_point),
-              right_point(right_point), w(w), h(h), nLambda(nLambda), nLambda2(nLambda2) {
+              right_point(right_point), w(w), h(h), nLambda(nLambda) {
         //std::cout << "Residual@ L:" << left_point.transpose() << " " << right_point.transpose() << std::endl;
     }
 
 
     template<typename T>
-    T undistortionDenominator(const T &r_distorted, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas,
-                              const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas2) const {
+    T undistortionDenominator(const T &r_distorted, const Eigen::Matrix<T, Eigen::Dynamic, 1> &lambdas) const {
 
-        return undistortion_utils::undistortionDenominator<T>(r_distorted, lambdas, lambdas2);
+        return undistortion_utils::undistortionDenominator<T>(r_distorted, lambdas);
     }
 
     template<typename T>
     bool operator()(T const *const *parameters, T *residuals) const {
         const T *lambda_ptr = parameters[0];
-        const T *lambda2_ptr = parameters[1];
-        const T *f_ptr = parameters[2];
+        const T *f_ptr = parameters[1];
 
         using Vector2T = Eigen::Matrix<T, 2, 1>;
         using Vector3T = Eigen::Matrix<T, 3, 1>;
@@ -82,8 +81,7 @@ public:
         VectorNL lambdas = Eigen::Map<const VectorNL>(lambda_ptr, nLambda);
         //Eigen::VectorXd lambdas_d;
 
-        VectorNL lambdas2 = Eigen::Map<const VectorNL>(lambda2_ptr, nLambda2);
-        //Eigen::VectorXd lambdas2_d;
+
 
 
         double r_d = double_cast(r);
@@ -111,7 +109,7 @@ public:
 
         const T &d = std::max(hT, wT) / T(2.0);
         T dr = d / r;
-        T alpha = undistortionDenominator<T>(dr, lambdas, lambdas2);
+        T alpha = undistortionDenominator<T>(dr, lambdas);
         //for (size_t kk = 0; kk < lambdas.size(); ++kk)
         //     std::cout << lambdas[kk] << " !!! ";
         //std::cout << "\n" << alpha << "A" << std::endl;
@@ -121,11 +119,19 @@ public:
 
         Vector2T u1, u2;
         bool is_correct;
-        auto res = undistortion_utils::computeEpipolarLineDistanceError<T>(lambdas, F, left_point_T, right_point_T, r,
+        std::pair<T, T> res;
+        if (nLambda == 1) {
+            res = undistortion_utils::computeEpipolarCurveDistanceError<T>(lambdas(0), F, left_point_T, right_point_T,
+                                                                           r,
                                                                            w, h,
                                                                            u1, u2,
                                                                            is_correct);
-
+        } else {
+            res = undistortion_utils::computeEpipolarLineDistanceError<T>(lambdas, F, left_point_T, right_point_T, r,
+                                                                          w, h,
+                                                                          u1, u2,
+                                                                          is_correct);
+        }
         residuals[0] = res.first;
         residuals[1] = res.second;
         return is_correct;
@@ -142,9 +148,9 @@ int main(int argc, char *argv[]) {
     std::string f_l;
     std::string f_f;
 
-    int non_linear_iter = 2;
-    std::vector<std::string> vec_names, left_cor_vec_names;
-    std::vector<std::string> vec_names2, right_cor_vec_names;
+    int non_linear_iter = 1;
+    std::vector<std::string> left_cor_vec_names;
+    std::vector<std::string> right_cor_vec_names;
     namespace po = boost::program_options;
     try {
 
@@ -157,17 +163,12 @@ int main(int argc, char *argv[]) {
                 ("n_iters", po::value<int>(&non_linear_iter), "Number of iterations")
                 ("lambda_f", po::value<std::string>(&f_l)->required(), "File with %n_pic estimated lambdas")
                 ("fund_f", po::value<std::string>(&f_f)->required(), "File with %n_pic estimated fundamental matrices")
-                ("left_inl_f", po::value<std::vector<std::string> >(&vec_names)->multitoken()->required(),
-                 "Path to left inliers")
-                ("right_inl_f", po::value<std::vector<std::string> >(&vec_names2)->multitoken()->required(),
-                 "Path to right inliers")
                 ("left_corr_f", po::value<std::vector<std::string> >(&left_cor_vec_names)->multitoken()->required(),
                  "Path to left correspondeces")
                 ("right_corr_f", po::value<std::vector<std::string> >(&right_cor_vec_names)->multitoken()->required(),
                  "Path to right correspondeces")
                 ("q", po::value<double>(&prcnt_inl), "quantile to minimize")
-                ("nlambda", po::value<int>(&nLambda)->default_value(1), "Number of parameters in denominator of model")
-                ("nlambda2", po::value<int>(&nLambda2)->default_value(0), "Number of parameters in nominator of model");
+                ("nlambda", po::value<int>(&nLambda)->default_value(1), "Number of parameters in denominator of model");
 
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -187,9 +188,8 @@ int main(int argc, char *argv[]) {
     std::fstream input_f1(f_f, std::fstream::in);
     std::fstream input_f2(f_l, std::fstream::in);
     Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda(nLambda, 1);
-    Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda2(nLambda2, 1);
+
     Lambda.setZero();
-    Lambda2.setZero();
     StdVector<Eigen::Matrix3d> Fvec(n_f);
 
 
@@ -211,12 +211,12 @@ int main(int argc, char *argv[]) {
 
         ceres::Problem problem;
         double *lambda_ptr = Lambda.data();
-        double *lambda2_ptr = Lambda2.data();
+
         for (size_t ll = 0; ll < Lambda.size(); ++ll)
             std::cout << Lambda[ll] << " ";
         std::cout << std::endl;
         problem.AddParameterBlock(lambda_ptr, nLambda);
-        problem.AddParameterBlock(lambda2_ptr, nLambda2);
+
 
         for (size_t k = 0; k < Fvec.size(); ++k) {
             //std::cout << Fvec[k] << std::endl;
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
                       << std::endl;
             std::cout << "Prcnt:inl " << boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((prcnt_inl + 1.0))
                       << std::endl;
-            undistortion_utils::UndistortionProblemHelper<double> helper(w, h, r, u1d, u2d, prcnt_inl);
+            undistortion_utils::UndistortionProblemHelper helper(w, h, r, u1d, u2d, prcnt_inl);
             helper.setHypLambdas(Lambda);
             helper.setHypF(Fvec[kk]);
             helper.findInliers("OptimizerResults/non_linear_optimizer_inl_comp" + std::to_string(kk) + "_img_" +
@@ -278,12 +278,11 @@ int main(int argc, char *argv[]) {
                 auto fun = new ceres::DynamicAutoDiffCostFunction<ErrorFunctor, 10>(
                         new ErrorFunctor(left, right, w, h, nLambda, 0));
                 fun->AddParameterBlock(nLambda);
-                fun->AddParameterBlock(nLambda2);
                 fun->AddParameterBlock(8);
                 fun->SetNumResiduals(2);
-                problem.AddResidualBlock(fun, /*new ceres::HuberLoss(15)*/ nullptr, lambda_ptr, lambda2_ptr,
+                problem.AddResidualBlock(fun, /*new ceres::HuberLoss(15)*/ nullptr, lambda_ptr,
                                          f_ptr);
-                const double *ptrs[] = {lambda_ptr, lambda2_ptr, f_ptr};
+                const double *ptrs[] = {lambda_ptr, f_ptr};
                 double ptrs_res[2];
                 fun->Evaluate(ptrs, ptrs_res, nullptr);
                 /*std::cout << ptrs_res[0] << " " << ptrs_res[1] << " " << left.transpose() << " " << right.transpose()
@@ -311,7 +310,7 @@ int main(int argc, char *argv[]) {
         ceres::Solve(options, &problem, &summary);
         std::cout << summary.BriefReport() << std::endl;
         //std::cout << F << std::endl;
-        std::cout << Lambda.transpose() << " and " << Lambda2.transpose() << std::endl;
+        std::cout << Lambda.transpose() << ": lambdas" << std::endl;
         double curr_residual_per_point = std::sqrt(summary.final_cost / residuals);
         std::cout << "final residual " << curr_residual_per_point << " (per point)" << std::endl;
         if (curr_residual_per_point < minimal_residuals_per_points) {
@@ -326,8 +325,8 @@ int main(int argc, char *argv[]) {
 
             Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
                       fmatrix_svd.matrixV().transpose();
-            std::cout << Fvec[k].determinant() << "\n" << Fvec[k] << "\n\n";
-            all_fund_matrices << Fvec[k] << std::endl;
+            std::cout << Fvec[k].determinant() << "\n" << Fvec[k] / Fvec[k](2, 2) << "\n\n";
+            all_fund_matrices << Fvec[k] / Fvec[k](2, 2) << std::endl;
         }
     }
     std::cout << "minimal residual " << minimal_residuals_per_points << " (per point)" << std::endl;

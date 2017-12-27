@@ -1,9 +1,9 @@
- --iters 500000 --inliers_f ../automatic_solver_results_D/552 --fund_f ../automatic_solver_results_D/552.f --q 0.1 --lambd_f ../automatic_solver_results_D/552.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/553 --fund_f ../automatic_solver_results_D/553.f --q 0.1 --lambd_f ../automatic_solver_results_D/553.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/554 --fund_f ../automatic_solver_results_D/554.f --q 0.1 --lambd_f ../automatic_solver_results_D/554.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/555 --fund_f ../automatic_solver_results_D/555.f --q 0.1 --lambd_f ../automatic_solver_results_D/555.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/556 --fund_f ../automatic_solver_results_D/556.f --q 0.1 --lambd_f ../automatic_solver_results_D/556.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/557 --fund_f ../automatic_solver_results_D/557.f --q 0.1 --lambd_f ../automatic_solver_results_D/557.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/558 --fund_f ../automatic_solver_results_D/558.f --q 0.1 --lambd_f ../automatic_solver_results_D/558.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/559 --fund_f ../automatic_solver_results_D/559.f --q 0.1 --lambd_f ../automatic_solver_results_D/559.l
- --iters 500000 --inliers_f ../automatic_solver_results_D/560 --fund_f ../automatic_solver_results_D/560.f --q 0.1 --lambd_f ../automatic_solver_results_D/560.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/552 --fund_f ../automatic_solver_results_D/552.f --q 0.05 --lambd_f ../automatic_solver_results_D/552.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/553 --fund_f ../automatic_solver_results_D/553.f --q 0.05 --lambd_f ../automatic_solver_results_D/553.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/554 --fund_f ../automatic_solver_results_D/554.f --q 0.05 --lambd_f ../automatic_solver_results_D/554.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/555 --fund_f ../automatic_solver_results_D/555.f --q 0.05 --lambd_f ../automatic_solver_results_D/555.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/556 --fund_f ../automatic_solver_results_D/556.f --q 0.05 --lambd_f ../automatic_solver_results_D/556.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/557 --fund_f ../automatic_solver_results_D/557.f --q 0.05 --lambd_f ../automatic_solver_results_D/557.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/558 --fund_f ../automatic_solver_results_D/558.f --q 0.05 --lambd_f ../automatic_solver_results_D/558.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/559 --fund_f ../automatic_solver_results_D/559.f --q 0.05 --lambd_f ../automatic_solver_results_D/559.l
+ --iters 100000 --up_threshold -1 --low_threshold -3 --inliers_f ../automatic_solver_results_D/560 --fund_f ../automatic_solver_results_D/560.f --q 0.05 --lambd_f ../automatic_solver_results_D/560.l

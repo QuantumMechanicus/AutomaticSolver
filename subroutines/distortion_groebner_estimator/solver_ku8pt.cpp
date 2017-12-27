@@ -11,9 +11,8 @@
 namespace eight_points_problem {
     AutomaticEstimator::AutomaticEstimator(double w, double h, const AutomaticEstimator::Points &u1d,
                                            const AutomaticEstimator::Points &u2d, double prcnt) :
-            helper_(undistortion_utils::UndistortionProblemHelper<double>(w, h, std::sqrt(
+            helper_(undistortion_utils::UndistortionProblemHelper(w, h, std::sqrt(
                     (w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0)), u1d, u2d, prcnt)) {
-        assert(u1d.cols() == u2d.cols() && "Points correspondences must be the same size");
 
     }
 
@@ -75,9 +74,9 @@ namespace eight_points_problem {
         u1d = helper_.getU1d();
         u2d = helper_.getU2d();
         for (std::size_t k = 0; k < number_of_RANSAC_iterations; ++k) {
-            std::cout << "\r" << 100 * double(k) / double(number_of_RANSAC_iterations) << "% completed: "
+            /*std::cout << "\r" << 100 * double(k) / double(number_of_RANSAC_iterations) << "% completed: "
                       << number_of_RANSAC_iterations;
-            std::cout.flush();
+            std::cout.flush();*/
             std::shuffle(numbers.begin(), numbers.end(), gen);
             EightPoints subset_Q1, subset_Q2;
             subset_Q1 << u1d.col(numbers[0]), u1d.col(numbers[1]), u1d.col(numbers[2]), u1d.col(
@@ -117,7 +116,7 @@ namespace eight_points_problem {
 
             }
         }
-
+        std::cout << "RANSAC done" << std::endl;
         findInliers(Lambda, F, inliers_output_file);
         return min_quantile;
     }

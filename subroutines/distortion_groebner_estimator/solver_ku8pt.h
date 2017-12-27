@@ -21,7 +21,7 @@ namespace eight_points_problem {
         typedef std::pair<std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>, std::vector<double> > FudnamentalMatricesAndDistrotionCoefficients;
 
     private:
-        undistortion_utils::UndistortionProblemHelper<double> helper_;
+        undistortion_utils::UndistortionProblemHelper helper_;
 
         FudnamentalMatricesAndDistrotionCoefficients
         solver_ku8pt(const GPolynomial &g1, const GPolynomial &g2, const GPolynomial &g3,
