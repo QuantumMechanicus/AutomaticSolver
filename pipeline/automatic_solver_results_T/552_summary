@@ -1,0 +1,9 @@
+Distortion coefficients: 
+-0.0359811 
+Fundamental matrix: 
+0.418907  243.209 -4.90239
+-246.627 0.109516  26.6068
+ 5.18615 -78.0892        1
+Quantile and confidence interval: 0.25339 1.96029 940 0.2
+Number of inliers: 640
+Squared error: 202.266

@@ -73,7 +73,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Estimated: " << est.estimate() << std::endl;
 
     std::fstream ff("/home/danielbord/CLionProjects/AutomaticSolver/subroutines/focal_length_estimator/testF.txt", std::fstream::in);
-
+    double allf = 0;
+    int c = 0;
     while (!ff.eof()) {
 
         double f11, f12, f13, f21, f22, f23, f31, f32, f33;
@@ -90,10 +91,9 @@ int main(int argc, char *argv[]) {
         double est_f = est.estimate();
 
         std::cout << "est f: " << est_f << std::endl;
-        est.setF(mf.transpose());
-        est_f = est.estimate();
-        std::cout << "est f2: " << est_f << std::endl;
 
+        allf += est_f;
+        ++c;
         k.setZero();
         k(0, 0) = est_f;
         k(1, 1) =est_f;
@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Ess:\n" << mf << std::endl;
 
     }
+    std::cout << "mean: " << allf/c << " " << 2*std::atan(allf/(2.0*c))<< std::endl;
     /*f << 27.948, -2381.82 , 26.8546,
     2378.93 , 33.8998 , 1015.57,
                       -12.1748 ,-988.609 ,0.994689;

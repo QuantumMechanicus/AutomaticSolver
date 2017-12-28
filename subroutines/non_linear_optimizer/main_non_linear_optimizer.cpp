@@ -32,13 +32,6 @@ void readPointsFromFile(const std::string &name, Eigen::Matrix<double, 2, Eigen:
 }
 
 
-template<typename T>
-double double_cast(const T &t) { return t.a; }
-
-template<>
-double double_cast<double>(const double &t) { return t; }
-
-
 class ErrorFunctor {
 private:
     Eigen::Vector3d left_point, right_point;
@@ -51,7 +44,6 @@ public:
                  const int nLambda, const int nLambda2)
             : left_point(left_point),
               right_point(right_point), w(w), h(h), nLambda(nLambda) {
-        //std::cout << "Residual@ L:" << left_point.transpose() << " " << right_point.transpose() << std::endl;
     }
 
 
@@ -79,16 +71,13 @@ public:
         T r = ceres::sqrt((wT / T(2.0)) * (wT / T(2.0)) + (hT / T(2.0)) * (hT / T(2.0)));
 
         VectorNL lambdas = Eigen::Map<const VectorNL>(lambda_ptr, nLambda);
-        //Eigen::VectorXd lambdas_d;
 
+        bool is_invertible = undistortion_utils::checkUndistortionInvertibility<T>(lambdas);
 
+        if (!is_invertible)
+            return false;
 
-
-        double r_d = double_cast(r);
-        //lambdas_d.resize(nLambda, 1);
-        //lambdas2_d.resize(nLambda2, 1);
-
-        Matrix3T F; //=  Eigen::Map<const Matrix3T >(f_ptr);
+        Matrix3T F;
         for (size_t k = 0; k < 3; ++k)
             for (size_t j = 0; j < 3; ++j) {
                 if (k < 2 || j < 2)
@@ -98,40 +87,28 @@ public:
         F(2, 2) = T(1);
         Eigen::JacobiSVD<Matrix3T> fmatrix_svd(F, Eigen::ComputeFullU | Eigen::ComputeFullV);
         Vector3T singular_values = fmatrix_svd.singularValues();
-        //std::cout << double_cast(singular_values[0]) << " " <<  double_cast(singular_values[1]) <<  " "<< double_cast(singular_values[2]) << "\n";
         singular_values[2] = T(0.0);
-
         F = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
             fmatrix_svd.matrixV().transpose();
-
         F = F / F(2, 2);
-        //std::cout <<  double_cast(F.determinant()) << " det\n";
 
         const T &d = std::max(hT, wT) / T(2.0);
         T dr = d / r;
         T alpha = undistortionDenominator<T>(dr, lambdas);
-        //for (size_t kk = 0; kk < lambdas.size(); ++kk)
-        //     std::cout << lambdas[kk] << " !!! ";
-        //std::cout << "\n" << alpha << "A" << std::endl;
-        // std::cout <<  dr2 << "dr2" << std::endl;
+
         if (alpha <= .0)
             return false;
 
         Vector2T u1, u2;
-        bool is_correct;
-        std::pair<T, T> res;
-        if (nLambda == 1) {
-            res = undistortion_utils::computeEpipolarCurveDistanceError<T>(lambdas(0), F, left_point_T, right_point_T,
-                                                                           r,
-                                                                           w, h,
-                                                                           u1, u2,
-                                                                           is_correct);
-        } else {
-            res = undistortion_utils::computeEpipolarLineDistanceError<T>(lambdas, F, left_point_T, right_point_T, r,
-                                                                          w, h,
-                                                                          u1, u2,
-                                                                          is_correct);
-        }
+        bool is_correct = true;
+        std::pair<T, T> res = undistortion_utils::computeEpipolarCurveDistanceError<T>(lambdas, F, left_point_T,
+                                                                                       right_point_T,
+                                                                                       r,
+                                                                                       w, h,
+                                                                                       u1, u2,
+                                                                                       is_correct);
+
+
         residuals[0] = res.first;
         residuals[1] = res.second;
         return is_correct;
@@ -140,15 +117,13 @@ public:
 
 
 int main(int argc, char *argv[]) {
-    double w = 7360.0, h = 4912.0, prcnt_inl = 0.2, r;
+    double w, h, prcnt_inl, r;
     std::string input1, input2;
-    int nLambda, nLambda2;
-    int nPictures;
-    int n_f;
-    std::string f_l;
-    std::string f_f;
-
-    int non_linear_iter = 1;
+    int number_of_distortion_coefficients;
+    int number_of_pictures;
+    std::string f_lambdas;
+    std::string f_fundamental_matrices;
+    int non_linear_iter;
     std::vector<std::string> left_cor_vec_names;
     std::vector<std::string> right_cor_vec_names;
     namespace po = boost::program_options;
@@ -159,16 +134,18 @@ int main(int argc, char *argv[]) {
                 ("help", "Print help message")
                 ("w", po::value<double>(&w)->required(), "Width")
                 ("h", po::value<double>(&h)->required(), "Height")
-                ("n_pic", po::value<int>(&n_f)->required(), "Number of pirctures")
-                ("n_iters", po::value<int>(&non_linear_iter), "Number of iterations")
-                ("lambda_f", po::value<std::string>(&f_l)->required(), "File with %n_pic estimated lambdas")
-                ("fund_f", po::value<std::string>(&f_f)->required(), "File with %n_pic estimated fundamental matrices")
+                ("n_pic", po::value<int>(&number_of_pictures)->required(), "Number of pirctures")
+                ("n_iters", po::value<int>(&non_linear_iter)->default_value(1), "Number of iterations")
+                ("lambda_f", po::value<std::string>(&f_lambdas)->required(), "File with %n_pic estimated lambdas")
+                ("fund_f", po::value<std::string>(&f_fundamental_matrices)->required(),
+                 "File with %n_pic estimated fundamental matrices")
                 ("left_corr_f", po::value<std::vector<std::string> >(&left_cor_vec_names)->multitoken()->required(),
                  "Path to left correspondeces")
                 ("right_corr_f", po::value<std::vector<std::string> >(&right_cor_vec_names)->multitoken()->required(),
                  "Path to right correspondeces")
-                ("q", po::value<double>(&prcnt_inl), "quantile to minimize")
-                ("nlambda", po::value<int>(&nLambda)->default_value(1), "Number of parameters in denominator of model");
+                ("q", po::value<double>(&prcnt_inl)->default_value(0.1), "quantile to minimize")
+                ("nlambda", po::value<int>(&number_of_distortion_coefficients)->default_value(1),
+                 "Number of parameters in denominator of model");
 
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -185,12 +162,12 @@ int main(int argc, char *argv[]) {
         return -2;
     }
 
-    std::fstream input_f1(f_f, std::fstream::in);
-    std::fstream input_f2(f_l, std::fstream::in);
-    Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda(nLambda, 1);
+    std::fstream input_f1(f_fundamental_matrices, std::fstream::in);
+    std::fstream input_f2(f_lambdas, std::fstream::in);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> Lambda(number_of_distortion_coefficients, 1);
 
     Lambda.setZero();
-    StdVector<Eigen::Matrix3d> Fvec(n_f);
+    StdVector<Eigen::Matrix3d> Fvec(number_of_pictures);
 
 
     r = std::sqrt(w * w + h * h) / 2.0;
@@ -198,7 +175,7 @@ int main(int argc, char *argv[]) {
     for (size_t iters = 0; iters < non_linear_iter; ++iters) {
 
         if (iters == 0) {
-            for (size_t kk = 0; kk < n_f; ++kk) {
+            for (size_t kk = 0; kk < number_of_pictures; ++kk) {
                 for (int ii = 0; ii < 3; ++ii)
                     for (int jj = 0; jj < 3; ++jj)
                         input_f1 >> Fvec[kk](ii, jj);
@@ -206,7 +183,7 @@ int main(int argc, char *argv[]) {
                 input_f2 >> cur_l;
                 Lambda[0] += cur_l;
             }
-            Lambda[0] /= n_f;
+            Lambda[0] /= number_of_pictures;
         }
 
         ceres::Problem problem;
@@ -215,23 +192,19 @@ int main(int argc, char *argv[]) {
         for (size_t ll = 0; ll < Lambda.size(); ++ll)
             std::cout << Lambda[ll] << " ";
         std::cout << std::endl;
-        problem.AddParameterBlock(lambda_ptr, nLambda);
+        problem.AddParameterBlock(lambda_ptr, number_of_distortion_coefficients);
 
 
         for (size_t k = 0; k < Fvec.size(); ++k) {
-            //std::cout << Fvec[k] << std::endl;
             Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);
             Eigen::Vector3d singular_values = fmatrix_svd.singularValues();
             singular_values[2] = 0.0;
-
             Fvec[k] = fmatrix_svd.matrixU() * singular_values.asDiagonal() *
                       fmatrix_svd.matrixV().transpose();
-            //std::cout << Fvec[k] << std::endl;
-            //std::cout << Fvec[k].determinant() << "\n"<< Fvec[k] << "\n\n";
         }
 
         int residuals = 0;
-        for (size_t kk = 0; kk < n_f; ++kk) {
+        for (size_t kk = 0; kk < number_of_pictures; ++kk) {
             double *f_ptr = Fvec[kk].data();
             Eigen::Matrix<double, 2, Eigen::Dynamic> u1d, u2d, i1d, i2d;
             std::string name1 = left_cor_vec_names[kk];
@@ -240,11 +213,6 @@ int main(int argc, char *argv[]) {
             readPointsFromFile(name2, u2d);
 
 
-            std::cout << "Prcnt:inl " << prcnt_inl << std::endl;
-            std::cout << "Prcnt:inl " << boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((0.3 + 1.0))
-                      << std::endl;
-            std::cout << "Prcnt:inl " << boost::math::erfc_inv((0.95 + 1.0)) / boost::math::erfc_inv((prcnt_inl + 1.0))
-                      << std::endl;
             undistortion_utils::UndistortionProblemHelper helper(w, h, r, u1d, u2d, prcnt_inl);
             helper.setHypLambdas(Lambda);
             helper.setHypF(Fvec[kk]);
@@ -258,9 +226,6 @@ int main(int argc, char *argv[]) {
                 i1d.col(ll) = u1d.col(inliers_ind[ll]);
                 i2d.col(ll) = u2d.col(inliers_ind[ll]);
             }
-
-            // readPointsFromFile(vec_names[kk], i1d);
-            //readPointsFromFile(vec_names2[kk], i2d);
 
 
             undistortion_utils::normalizePoints(i1d, w, h, r);
@@ -276,17 +241,17 @@ int main(int argc, char *argv[]) {
                 left[2] = right[2] = 1.0;
 
                 auto fun = new ceres::DynamicAutoDiffCostFunction<ErrorFunctor, 10>(
-                        new ErrorFunctor(left, right, w, h, nLambda, 0));
-                fun->AddParameterBlock(nLambda);
+                        new ErrorFunctor(left, right, w, h, number_of_distortion_coefficients, 0));
+                fun->AddParameterBlock(number_of_distortion_coefficients);
                 fun->AddParameterBlock(8);
                 fun->SetNumResiduals(2);
                 problem.AddResidualBlock(fun, /*new ceres::HuberLoss(15)*/ nullptr, lambda_ptr,
                                          f_ptr);
-                const double *ptrs[] = {lambda_ptr, f_ptr};
-                double ptrs_res[2];
-                fun->Evaluate(ptrs, ptrs_res, nullptr);
-                /*std::cout << ptrs_res[0] << " " << ptrs_res[1] << " " << left.transpose() << " " << right.transpose()
-                          << std::endl;*/
+                /*const double *ptrs[] = {lambda_ptr, f_ptr};
+                 double ptrs_res[2];
+                 fun->Evaluate(ptrs, ptrs_res, nullptr);
+                 std::cout << ptrs_res[0] << " " << ptrs_res[1] << " " << left.transpose() << " " << right.transpose()
+                           << std::endl;*/
                 ++residuals;
             }
 
@@ -309,8 +274,7 @@ int main(int argc, char *argv[]) {
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
         std::cout << summary.BriefReport() << std::endl;
-        //std::cout << F << std::endl;
-        std::cout << Lambda.transpose() << ": lambdas" << std::endl;
+        std::cout << Lambda.transpose() << " --- estimated lambdas" << std::endl;
         double curr_residual_per_point = std::sqrt(summary.final_cost / residuals);
         std::cout << "final residual " << curr_residual_per_point << " (per point)" << std::endl;
         if (curr_residual_per_point < minimal_residuals_per_points) {

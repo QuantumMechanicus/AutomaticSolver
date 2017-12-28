@@ -45,8 +45,7 @@ namespace undistortion_utils {
 
 
     void UndistortionProblemHelper::computeErrors() {
-
-
+        errors_.resize(number_of_points_, std::numeric_limits<double>::max());
         for (size_t k = 0; k < number_of_points_; ++k) {
             Eigen::Matrix<double, 2, 1> u1k, cu1k;
             Eigen::Matrix<double, 2, 1> u2k, cu2k;
@@ -77,7 +76,7 @@ namespace undistortion_utils {
         std::vector<double> errors(errors_);
         std::nth_element(errors.begin(), errors.begin() + int(errors.size() * expected_percent_of_inliers_),
                          errors.end());
-        quantile_ = errors[int(errors.size() * expected_percent_of_inliers_)];
+        quantile_ = errors[int(errors.size() * expected_percent_of_inliers_) + 1];
         confidence_interval_ =
                 quantile_ * boost::math::erfc_inv((0.95 + 1.0)) /
                 boost::math::erfc_inv((expected_percent_of_inliers_ + 1.0));
@@ -118,7 +117,7 @@ namespace undistortion_utils {
         }
         f_lambdas << "\n" << alpha_ << std::endl;
         minimal_summary << "\nFundamental matrix: \n" << hyp_F_ << "\n";
-        minimal_summary << "Quantile and confidence interval: " << quantile_ << " " << confidence_interval_ << "\n";
+        minimal_summary << "Quantile and confidence interval: " << quantile_ << " " << confidence_interval_ << " " << errors_.size() << " " << expected_percent_of_inliers_ << "\n";
         inliers_ind_.resize(0);
 
         for (size_t k = 0; k < u1d_.cols(); ++k) {

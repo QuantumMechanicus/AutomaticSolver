@@ -1,15 +1,15 @@
-names = 'ABCD';
-for n = 557:560
-    for k = 4:4
+names = 'ABCDT';
+for n = 554:555
+    for k = 5:5
         n1 = strcat('images/', num2str(n),'/', names(k), '.JPG');
         n2 = strcat('images/', num2str(n + 1),'/', names(k), '.JPG');
         I1 = rgb2gray(imread(n1));
         I2 = rgb2gray(imread(n2));
-        roi1 = [1 1 7360 4700];
-        roi2 = [1  1 7360 4700];
+        %roi1 = [1 1 7360 4700];
+        %roi2 = [1  1 7360 4700];
         
-        points1 = detectSURFFeatures(I1, 'NumOctaves', 4, 'MetricThreshold', 1000, 'NumScaleLevels', 6, 'ROI', roi1);
-        points2 = detectSURFFeatures(I2, 'NumOctaves', 4, 'MetricThreshold', 1000, 'NumScaleLevels', 6, 'ROI', roi2);
+        points1 = detectSURFFeatures(I1, 'NumOctaves', 4, 'MetricThreshold', 1000, 'NumScaleLevels', 6);
+        points2 = detectSURFFeatures(I2, 'NumOctaves', 4, 'MetricThreshold', 1000, 'NumScaleLevels', 6);
         
         [features1,valid_points1] = extractFeatures(I1,points1);
         [features2,valid_points2] = extractFeatures(I2,points2);

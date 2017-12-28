@@ -4,20 +4,18 @@
 
 
 
-#include <fstream>
-#include <random>
 #include "solver_ku8pt.h"
 
 namespace eight_points_problem {
     AutomaticEstimator::AutomaticEstimator(double w, double h, const AutomaticEstimator::Points &u1d,
-                                           const AutomaticEstimator::Points &u2d, double prcnt) :
+                                           const AutomaticEstimator::Points &u2d, double quantile) :
             helper_(undistortion_utils::UndistortionProblemHelper(w, h, std::sqrt(
-                    (w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0)), u1d, u2d, prcnt)) {
+                    (w / 2.0) * (w / 2.0) + (h / 2.0) * (h / 2.0)), u1d, u2d, quantile)) {
 
     }
 
 
-    AutomaticEstimator::FudnamentalMatricesAndDistrotionCoefficients
+    AutomaticEstimator::FundamentalMatricesAndDistrotionCoefficients
     AutomaticEstimator::run_solver8pt(EightPoints u1d, EightPoints u2d) {
         Eigen::Matrix<double, 15, 8> C;
         Eigen::Matrix<double, 8, 15> Cfm;
@@ -74,9 +72,7 @@ namespace eight_points_problem {
         u1d = helper_.getU1d();
         u2d = helper_.getU2d();
         for (std::size_t k = 0; k < number_of_RANSAC_iterations; ++k) {
-            /*std::cout << "\r" << 100 * double(k) / double(number_of_RANSAC_iterations) << "% completed: "
-                      << number_of_RANSAC_iterations;
-            std::cout.flush();*/
+
             std::shuffle(numbers.begin(), numbers.end(), gen);
             EightPoints subset_Q1, subset_Q2;
             subset_Q1 << u1d.col(numbers[0]), u1d.col(numbers[1]), u1d.col(numbers[2]), u1d.col(
@@ -85,12 +81,12 @@ namespace eight_points_problem {
                     numbers[3]), u2d.col(numbers[4]), u2d.col(numbers[5]), u2d.col(numbers[6]), u2d.col(numbers[7]);
 
 
-            FudnamentalMatricesAndDistrotionCoefficients models = run_solver8pt(subset_Q1, subset_Q2);
+            FundamentalMatricesAndDistrotionCoefficients models = run_solver8pt(subset_Q1, subset_Q2);
             unsigned long count = models.first.size();
 
 
             for (std::size_t i = 0; i < count; ++i) {
-                if (models.second[i] > lower_threshold or models.second[i] < upper_threshold or
+                if (models.second[i] > upper_threshold or models.second[i] < lower_threshold or
                     models.first[i].determinant() > 1)
                     continue;
 
@@ -116,7 +112,7 @@ namespace eight_points_problem {
 
             }
         }
-        std::cout << "RANSAC done" << std::endl;
+        std::cout << "Estimation finished\n" << std::endl;
         findInliers(Lambda, F, inliers_output_file);
         return min_quantile;
     }
@@ -141,7 +137,7 @@ namespace eight_points_problem {
         return helper_.findInliers(out_name);
     }
 
-    AutomaticEstimator::FudnamentalMatricesAndDistrotionCoefficients
+    AutomaticEstimator::FundamentalMatricesAndDistrotionCoefficients
     AutomaticEstimator::solver_ku8pt(const AutomaticEstimator::GPolynomial &g1,
                                      const AutomaticEstimator::GPolynomial &g2,
                                      const AutomaticEstimator::GPolynomial &g3,
@@ -584,8 +580,6 @@ namespace eight_points_problem {
 
         Eigen::FullPivHouseholderQR<Eigen::Matrix<long double, 32, 32>> qr(
                 M.template block<32, 32>(0, 0).cast<long double>());
-        //Eigen::JacobiSVD<Eigen::Matrix<double, 32, 32>> qr(M.template block<32, 32>(0, 0), Eigen::ComputeFullU | Eigen::ComputeFullV);
-
 
         Eigen::Matrix<long double, 32, 16> Mres = qr.solve(M.template block<32, 16>(0, 32).cast<long double>());
 
@@ -614,7 +608,7 @@ namespace eight_points_problem {
                     Eigen::DiagonalMatrix<std::complex<double>, 16>(
                             V.template block<1, 16>(0, 0).cwiseInverse())).eval();
         sol.row(0).swap(sol.row(2));
-        AutomaticEstimator::FudnamentalMatricesAndDistrotionCoefficients res;
+        AutomaticEstimator::FundamentalMatricesAndDistrotionCoefficients res;
         for (size_t k = 0; k < sol.cols(); ++k) {
             if (std::abs(sol(0, k).imag()) < helper_.EPS) {
                 double lambda = sol(2, k).real();
