@@ -76,12 +76,11 @@ int main(int argc, char *argv[]) {
     double allf = 0;
     int c = 0;
     while (!ff.eof()) {
-
+        std::cout <<"GO\n";
         double f11, f12, f13, f21, f22, f23, f31, f32, f33;
 
         ff >> f11 >> f12 >> f13 >> f21 >> f22 >> f23 >> f31 >> f32 >> f33;
-        if (ff.eof())
-            break;
+
         Eigen::Matrix3d mf, me;
 
         mf << f11, f12, f13, f21, f22, f23, f31, f32, f33;
