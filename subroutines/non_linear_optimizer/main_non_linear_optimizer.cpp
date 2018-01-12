@@ -4,8 +4,7 @@
 #include "ceres/ceres.h"
 #include <iostream>
 #include "undistortion_problem_utils.h"
-#include <boost/math/special_functions/erf.hpp>
-#include <unsupported/Eigen/Polynomials>
+
 
 namespace po = boost::program_options;
 
@@ -123,6 +122,7 @@ int main(int argc, char *argv[]) {
     int number_of_pictures;
     std::string f_lambdas;
     std::string f_fundamental_matrices;
+    std::string f_optimzer_results;
     int non_linear_iter;
     std::vector<std::string> left_cor_vec_names;
     std::vector<std::string> right_cor_vec_names;
@@ -144,6 +144,8 @@ int main(int argc, char *argv[]) {
                 ("right_corr_f", po::value<std::vector<std::string> >(&right_cor_vec_names)->multitoken()->required(),
                  "Path to right correspondeces")
                 ("q", po::value<double>(&prcnt_inl)->default_value(0.1), "quantile to minimize")
+                ("results_f", po::value<std::string>(&f_optimzer_results)->default_value("./OptimizerResults/"),
+                 "Path to results directory")
                 ("nlambda", po::value<int>(&number_of_distortion_coefficients)->default_value(1),
                  "Number of parameters in denominator of model");
 
@@ -216,8 +218,8 @@ int main(int argc, char *argv[]) {
             undistortion_utils::UndistortionProblemHelper helper(w, h, r, u1d, u2d, prcnt_inl);
             helper.setHypLambdas(Lambda);
             helper.setHypF(Fvec[kk]);
-            helper.findInliers("OptimizerResults/non_linear_optimizer_inl_comp" + std::to_string(kk) + "_img_" +
-                               std::to_string(iters) + "_iter");
+            helper.findInliers(f_optimzer_results + "non_linear_optimizer_info_for" + std::to_string(kk) + "_image_on" +
+                               std::to_string(iters) + "_iteration");
             auto &inliers_ind = helper.getInliersIndices();
 
             i1d.resize(Eigen::NoChange, inliers_ind.size());
@@ -280,7 +282,7 @@ int main(int argc, char *argv[]) {
         if (curr_residual_per_point < minimal_residuals_per_points) {
             minimal_residuals_per_points = curr_residual_per_point;
         }
-        std::fstream all_fund_matrices("./OptimizerResults/all_f" + std::to_string(iters) + "_iters",
+        std::fstream all_fund_matrices(f_optimzer_results + "on_" + std::to_string(iters) + "_iter_all. ff",
                                        std::fstream::out);
         for (size_t k = 0; k < Fvec.size(); ++k) {
             Eigen::JacobiSVD<Eigen::Matrix3d> fmatrix_svd(Fvec[k], Eigen::ComputeFullU | Eigen::ComputeFullV);

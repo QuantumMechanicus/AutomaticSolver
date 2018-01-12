@@ -16,7 +16,7 @@ namespace eight_points_problem {
 
 
     AutomaticEstimator::FundamentalMatricesAndDistrotionCoefficients
-    AutomaticEstimator::run_solver8pt(EightPoints u1d, EightPoints u2d) {
+    AutomaticEstimator::runSolver(EightPoints u1d, EightPoints u2d) {
         Eigen::Matrix<double, 15, 8> C;
         Eigen::Matrix<double, 8, 15> Cfm;
 
@@ -52,7 +52,7 @@ namespace eight_points_problem {
         GPolynomial g7 = G.row(6);
         GPolynomial g8 = G.row(7);
 
-        return solver_ku8pt(g1, g2, g3, g4, g5, g6, g7, g8);
+        return solver(g1, g2, g3, g4, g5, g6, g7, g8);
     }
 
     double
@@ -81,7 +81,7 @@ namespace eight_points_problem {
                     numbers[3]), u2d.col(numbers[4]), u2d.col(numbers[5]), u2d.col(numbers[6]), u2d.col(numbers[7]);
 
 
-            FundamentalMatricesAndDistrotionCoefficients models = run_solver8pt(subset_Q1, subset_Q2);
+            FundamentalMatricesAndDistrotionCoefficients models = runSolver(subset_Q1, subset_Q2);
             unsigned long count = models.first.size();
 
 
@@ -138,14 +138,14 @@ namespace eight_points_problem {
     }
 
     AutomaticEstimator::FundamentalMatricesAndDistrotionCoefficients
-    AutomaticEstimator::solver_ku8pt(const AutomaticEstimator::GPolynomial &g1,
-                                     const AutomaticEstimator::GPolynomial &g2,
-                                     const AutomaticEstimator::GPolynomial &g3,
-                                     const AutomaticEstimator::GPolynomial &g4,
-                                     const AutomaticEstimator::GPolynomial &g5,
-                                     const AutomaticEstimator::GPolynomial &g6,
-                                     const AutomaticEstimator::GPolynomial &g7,
-                                     const AutomaticEstimator::GPolynomial &g8) {
+    AutomaticEstimator::solver(const AutomaticEstimator::GPolynomial &g1,
+                               const AutomaticEstimator::GPolynomial &g2,
+                               const AutomaticEstimator::GPolynomial &g3,
+                               const AutomaticEstimator::GPolynomial &g4,
+                               const AutomaticEstimator::GPolynomial &g5,
+                               const AutomaticEstimator::GPolynomial &g6,
+                               const AutomaticEstimator::GPolynomial &g7,
+                               const AutomaticEstimator::GPolynomial &g8) {
         Eigen::Matrix<double, 59, 1> c;
         c(0) = -g6(2);
         c(1) = g5(2) - g6(5);

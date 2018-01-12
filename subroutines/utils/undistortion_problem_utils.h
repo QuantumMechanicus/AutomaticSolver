@@ -27,6 +27,9 @@ namespace Eigen {
     }  // namespace internal
 }
 
+namespace base{
+
+}
 
 namespace undistortion_utils {
 

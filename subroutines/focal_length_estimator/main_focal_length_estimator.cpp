@@ -40,14 +40,17 @@ int main(int argc, char *argv[]) {
     double rr =1.663544010175267/2;
 
     std::cout << "al:" <<   undistortion_utils::undistortionDenominator<long double>(rr, lmbd) << std::endl;
-    Eigen::Matrix3d f, k, k2, r, t, f2;
+    Eigen::Matrix3d f, k, k2, r, t, f2, kkk;
 
-    r = Sophus::SO3d::rotX(0.7).matrix() * Sophus::SO3d::rotY(1.1).matrix();
+    r = Sophus::SO3d::rotX(0.4).matrix() * Sophus::SO3d::rotY(0.9).matrix();
     t.setZero();
     Eigen::Vector3d tt;
+    kkk.setZero();
+    kkk(0, 0) = kkk(1,1) = 3115.0/1000.0;
+    kkk(2,2) = 1;
     tt(0) = 1;
     tt(1) = 1;
-    tt(2) = -0.7;
+    tt(2) = -1;
     tt.normalize();
     t(0, 1) = -tt(2);
     t(0, 2) = tt(1);
@@ -57,20 +60,21 @@ int main(int argc, char *argv[]) {
     t(2, 1) = tt(0);
 
     k.setZero();
-    k(0, 0) = 10;
-    k(1, 1) = 10;
+    k(0, 0) = 1500;
+    k(1, 1) = 1500;
     k(2, 2) = 1;
 
     k2.setZero();
-    k2(0, 0) = 10;
-    k2(1, 1) = 10;
+    k2(0, 0) = 1500;
+    k2(1, 1) = 1500;
     k2(2, 2) = 1;
-    f = k * r * t * k2;
+    f = k.inverse() * t * r * k2.inverse();
     double fnorm = f.norm();
     f = f / fnorm;
     std::cout << std::endl << "F: \n" << f << std::endl << std::endl;
     FocalLengthEstimator est(f);
-    std::cout << "Estimated: " << est.estimate() << std::endl;
+    auto ans = est.estimate();
+    std::cout << "Estimated: " << ans << std::endl;
 
     std::fstream ff("/home/danielbord/CLionProjects/AutomaticSolver/subroutines/focal_length_estimator/testF.txt", std::fstream::in);
     double allf = 0;
@@ -84,6 +88,9 @@ int main(int argc, char *argv[]) {
         Eigen::Matrix3d mf, me;
 
         mf << f11, f12, f13, f21, f22, f23, f31, f32, f33;
+
+
+
         std::cout << "Fund:\n" << mf << std::endl;
         mf = mf/mf.norm();
         est.setF(mf);
@@ -101,7 +108,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Ess:\n" << mf << std::endl;
 
     }
-    std::cout << "mean: " << allf/c << " " << 2*std::atan(allf/(2.0*c))<< std::endl;
+    std::cout << "mean: " << allf/c << " " << 180*2*std::atan(c/(allf))/M_PI<< std::endl;
     /*f << 27.948, -2381.82 , 26.8546,
     2378.93 , 33.8998 , 1015.57,
                       -12.1748 ,-988.609 ,0.994689;

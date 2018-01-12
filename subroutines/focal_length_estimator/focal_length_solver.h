@@ -68,11 +68,11 @@ public:
             std::cout << r[kk] << std::endl;
             if (std::abs(imag) < 1e-9 && real > 0) {
                 f2 = real;
-                break;
+                std::cout << "real root: " << real << std:: endl;
             }
 
         }
-        return 1.0/std::sqrt(f2);
+        return std::sqrt(f2);
     }
 };
 

@@ -26,11 +26,11 @@ namespace eight_points_problem {
         undistortion_utils::UndistortionProblemHelper helper_;
 
         FundamentalMatricesAndDistrotionCoefficients
-        solver_ku8pt(const GPolynomial &g1, const GPolynomial &g2, const GPolynomial &g3,
-                     const GPolynomial &g4, const GPolynomial &g5, const GPolynomial &g6,
-                     const GPolynomial &g7, const GPolynomial &g8);
+        solver(const GPolynomial &g1, const GPolynomial &g2, const GPolynomial &g3,
+               const GPolynomial &g4, const GPolynomial &g5, const GPolynomial &g6,
+               const GPolynomial &g7, const GPolynomial &g8);
 
-        FundamentalMatricesAndDistrotionCoefficients run_solver8pt(EightPoints u1d, EightPoints u2d);
+        FundamentalMatricesAndDistrotionCoefficients runSolver(EightPoints u1d, EightPoints u2d);
 
 
         double estimateQuantile(double hyp_lambda, const Eigen::Matrix3d &hyp_F);
